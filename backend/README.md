@@ -55,10 +55,10 @@ API будет доступен по адресу: **http://localhost:3000** (э
 
 ## Фронтенд
 
-Для работы с фронтендом (Vite, React) в `saitLFK`:
+Для работы с фронтендом (Vite, React) в `frontend`:
 
 1. Запустите бэкенд: `uvicorn main:app --reload --port 8000`
-2. Запустите фронтенд: `cd saitLFK && npm run dev`
+2. Запустите фронтенд: `cd frontend && npm run dev`
 3. Откройте http://localhost:5173
 
 CORS настроен для `http://localhost:5173` и `http://localhost:3000`. При запросах к API передавайте заголовок `X-User-Id` (ID текущего пользователя после логина).
