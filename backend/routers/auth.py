@@ -1,6 +1,10 @@
 # routers/auth.py — эндпоинты авторизации (login, register)
-from fastapi import APIRouter, HTTPException, Body
-from store import users
+from fastapi import APIRouter, HTTPException, Body, Depends
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from db import get_db
+from db_models import User
 from models import UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -26,8 +30,8 @@ def _validate_auth(data: dict) -> list[dict]:
 
 
 @router.post("/login", response_model=UserResponse)
-def login(body: dict = Body(...)):
-    """Вход: валидация полей, поиск/создание пользователя по email+role"""
+def login(body: dict = Body(...), db: Session = Depends(get_db)):
+    """Вход: валидация полей, поиск/создание пользователя по email+role."""
     errs = _validate_auth(body)
     if errs:
         raise HTTPException(
@@ -38,12 +42,12 @@ def login(body: dict = Body(...)):
                 "errors": errs,
             },
         )
-    return _auth_impl(body)
+    return _auth_impl(body, db)
 
 
 @router.post("/register", response_model=UserResponse)
-def register(body: dict = Body(...)):
-    """Регистрация: то же, что и login (упрощённая авторизация)"""
+def register(body: dict = Body(...), db: Session = Depends(get_db)):
+    """Регистрация: то же, что и login (упрощённая авторизация)."""
     errs = _validate_auth(body)
     if errs:
         raise HTTPException(
@@ -54,29 +58,57 @@ def register(body: dict = Body(...)):
                 "errors": errs,
             },
         )
-    return _auth_impl(body)
+    return _auth_impl(body, db)
 
 
-def _auth_impl(data: dict) -> UserResponse:
-    """Общая логика: ищем по email+role или создаём нового"""
+def _auth_impl(data: dict, db: Session) -> UserResponse:
+    """
+    Общая логика авторизации создаётся, чтобы:
+    - найти пользователя по email+role в БД;
+    - при отсутствии создать новую запись и вернуть её.
+    """
     email = (data.get("email") or "").strip()
     role = data.get("role") if data.get("role") in ("user", "specialist") else "user"
     firstName = (data.get("firstName") or "").strip()
     lastName = (data.get("lastName") or "").strip()
     phone = (data.get("phone") or "").strip() if role == "user" else None
-    # Для демо: один пациент u1, один специалист spec1
-    for uid, u in users.items():
-        if u.get("email") == email and u.get("role") == role:
-            return UserResponse(**u)
-    # Создаём нового (для регистрации)
-    new_id = f"u-{len(users) + 1}" if role == "user" else f"spec-{len([x for x in users.values() if x.get('role') == 'specialist']) + 1}"
-    user_data = {
-        "id": new_id,
-        "role": role,
-        "email": email,
-        "firstName": firstName,
-        "lastName": lastName,
-        "phone": phone,
-    }
-    users[new_id] = user_data
-    return UserResponse(**user_data)
+
+    stmt = select(User).where(User.email == email, User.role == role)
+    existing = db.execute(stmt).scalar_one_or_none()
+    if existing:
+        return UserResponse(
+            id=existing.id,
+            role=existing.role,
+            email=existing.email,
+            firstName=existing.first_name,
+            lastName=existing.last_name,
+            phone=existing.phone,
+        )
+
+    # Генерация нового идентификатора в формате, совместимом с фронтендом.
+    prefix = "u" if role == "user" else "spec"
+    # Считаем существующих пользователей с такой ролью, чтобы сделать простую нумерацию.
+    count_stmt = select(User).where(User.role == role)
+    count = len(db.execute(count_stmt).scalars().all())
+    new_id = f"{prefix}-{count + 1}"
+
+    new_user = User(
+        id=new_id,
+        role=role,
+        email=email,
+        first_name=firstName,
+        last_name=lastName,
+        phone=phone,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return UserResponse(
+        id=new_user.id,
+        role=new_user.role,
+        email=new_user.email,
+        firstName=new_user.first_name,
+        lastName=new_user.last_name,
+        phone=new_user.phone,
+    )

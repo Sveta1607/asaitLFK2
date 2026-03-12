@@ -11,7 +11,9 @@ function headers(userId?: string): Record<string, string> {
   return h;
 }
 
-// Ошибка с сообщением от сервера (detail может быть строкой или объектом)
+// Ошибка с сообщением от сервера (detail может быть строкой или объектом).
+// Этот вспомогательный блок создан, чтобы аккуратно разобрать detail и вернуть
+// человекочитаемое сообщение для отображения в интерфейсе без лишних побочных запросов.
 async function parseError(res: Response): Promise<string> {
   try {
     const data = await res.json();
@@ -39,7 +41,8 @@ export async function apiAuth(
     const msg = await parseError(res);
     throw new Error(msg);
   }
-  return res.json();
+  const user = (await res.json()) as User;
+  return user;
 }
 
 // --- Users ---
@@ -57,7 +60,8 @@ export async function apiUpdateUser(userId: string, email: string): Promise<User
 export async function apiGetNews(): Promise<NewsItem[]> {
   const res = await fetch(`${API_BASE}/news`);
   if (!res.ok) throw new Error(await parseError(res));
-  return res.json();
+  const items = (await res.json()) as NewsItem[];
+  return items;
 }
 
 export async function apiAddNews(
@@ -97,7 +101,8 @@ export async function apiGetSlots(
   if (date) params.set('date', date);
   const res = await fetch(`${API_BASE}/slots?${params}`, { headers: headers(userId) });
   if (!res.ok) throw new Error(await parseError(res));
-  return res.json();
+  const items = (await res.json()) as TimeSlot[];
+  return items;
 }
 
 export async function apiCreateSlot(
@@ -144,7 +149,8 @@ export async function apiGetBookings(
   if (params.specialistId) q.set('specialistId', params.specialistId);
   const res = await fetch(`${API_BASE}/bookings?${q}`, { headers: headers(userId) });
   if (!res.ok) throw new Error(await parseError(res));
-  return res.json();
+  const items = (await res.json()) as Booking[];
+  return items;
 }
 
 export async function apiCreateBookingByPatient(

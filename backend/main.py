@@ -4,10 +4,11 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from store import init_store
+from db import init_db
 from routers import auth, users, news, slots, bookings  # noqa: F401
 
-# Загружаем переменные из .env
+# Блок: загрузка переменных окружения.
+# Нужен, чтобы прочитать PORT, HOST, DATABASE_URL и дополнительные CORS_ORIGINS из .env.
 load_dotenv()
 
 app = FastAPI(
@@ -16,7 +17,8 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS: разрешаем запросы с фронтенда (Vite dev server)
+# Блок: настройка CORS для dev-среды.
+# Нужен, чтобы фронтенд на Vite (localhost:5173 и др.) мог обращаться к API.
 origins = [
     "http://localhost:5173",
     "http://localhost:5174",
@@ -37,7 +39,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Подключаем роутеры под префиксом /api
+# Блок: подключение роутеров под префиксом /api.
+# Нужен, чтобы сгруппировать все эндпоинты и сохранить существующий контракт с фронтендом.
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(news.router, prefix="/api")
@@ -46,18 +49,22 @@ app.include_router(bookings.router, prefix="/api")
 
 
 @app.on_event("startup")
-def startup():
-    """Инициализация in-memory хранилища при старте"""
-    init_store()
+def startup() -> None:
+    """
+    Этот обработчик создаётся, чтобы:
+    - инициализировать подключение к БД;
+    - создать таблицы и базовые тестовые данные вместо старого init_store().
+    """
+    init_db()
 
 
 @app.get("/")
 def root():
-    """Корневой эндпоинт для проверки работы"""
+    """Корневой эндпоинт для проверки работы API."""
     return {"message": "API Сайт ЛФК", "docs": "/docs"}
 
 
 @app.get("/health")
 def health():
-    """Health check"""
+    """Health check для мониторинга состояния сервера."""
     return {"status": "ok"}
