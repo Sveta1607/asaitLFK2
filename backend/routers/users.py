@@ -55,7 +55,11 @@ def get_me(
 
 @router.patch("/me", response_model=UserResponse)
 def update_me(body: UserUpdateRequest, db: Session = Depends(get_db)):
-    """Обновление профиля (email). В теле передаётся userId (без JWT)."""
+    """
+    Этот обработчик создаётся, чтобы:
+    - обновлять e-mail, имя, фамилию и телефон пользователя;
+    - использовать простую схему без JWT, принимая userId в теле запроса.
+    """
     stmt = select(User).where(User.id == body.userId)
     user = db.execute(stmt).scalar_one_or_none()
     if not user:
@@ -64,6 +68,12 @@ def update_me(body: UserUpdateRequest, db: Session = Depends(get_db)):
             detail={"detail": "Пользователь не найден.", "code": "USER_NOT_FOUND"},
         )
     user.email = body.email.strip()
+    if body.firstName is not None:
+        user.first_name = body.firstName.strip() or None
+    if body.lastName is not None:
+        user.last_name = body.lastName.strip() or None
+    if body.phone is not None:
+        user.phone = body.phone.strip() or None
     db.add(user)
     db.commit()
     db.refresh(user)

@@ -77,20 +77,28 @@ def list_bookings(
         )
     stmt = stmt.order_by(Booking.date, Booking.time)
     rows = db.execute(stmt).scalars().all()
-    return [
-        {
-            "id": b.id,
-            "specialistId": b.specialist_id,
-            "userId": b.user_id,
-            "date": b.date,
-            "time": b.time,
-            "lastName": b.last_name,
-            "firstName": b.first_name,
-            "phone": b.phone,
-            "status": b.status,
-        }
-        for b in rows
-    ]
+    # Этот блок создаётся, чтобы:
+    # - дополнительно вернуть ФИО специалиста для каждой записи;
+    # - не ломать текущий фронтенд, сохранив предыдущие поля ответа.
+    result: list[dict] = []
+    for b in rows:
+        specialist = b.specialist
+        result.append(
+            {
+                "id": b.id,
+                "specialistId": b.specialist_id,
+                "userId": b.user_id,
+                "date": b.date,
+                "time": b.time,
+                "lastName": b.last_name,
+                "firstName": b.first_name,
+                "phone": b.phone,
+                "status": b.status,
+                "specialistLastName": getattr(specialist, "last_name", None) if specialist else None,
+                "specialistFirstName": getattr(specialist, "first_name", None) if specialist else None,
+            }
+        )
+    return result
 
 
 @router.post("", status_code=201)

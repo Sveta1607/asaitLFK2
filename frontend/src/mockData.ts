@@ -34,6 +34,11 @@ export type Booking = {
   firstName: string;
   phone?: string;
   status: 'active' | 'cancelled';
+  // Эти поля создаются, чтобы:
+  // - отображать ФИО специалиста в списке записей пациента;
+  // - при этом не требовать отдельного запроса за данными специалиста.
+  specialistLastName?: string | null;
+  specialistFirstName?: string | null;
 };
 
 // Тип новости для главной страницы

@@ -61,14 +61,23 @@ def _next_slot_id() -> str:
 
 @router.get("", response_model=list[SlotResponse])
 def list_slots(
-    specialistId: str = Query(..., description="ID специалиста"),
+    specialistId: Optional[str] = Query(
+        None,
+        description="ID специалиста; если не указан, возвращаются слоты всех специалистов",
+    ),
     date: Optional[str] = Query(None, description="Фильтр по дате YYYY-MM-DD"),
     db: Session = Depends(get_db),
     x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
-    """Список слотов — только для авторизованных (пациент/специалист)."""
+    """
+    Этот обработчик создаётся, чтобы:
+    - отдавать список слотов как по конкретному специалисту, так и по всем сразу;
+    - позволить пациентам видеть расписание нескольких специалистов без дополнительных ручек.
+    """
     _require_auth(db, x_user_id)
-    stmt = select(Slot).where(Slot.specialist_id == specialistId)
+    stmt = select(Slot)
+    if specialistId:
+        stmt = stmt.where(Slot.specialist_id == specialistId)
     if date:
         stmt = stmt.where(Slot.date == date)
     stmt = stmt.order_by(Slot.date, Slot.time)

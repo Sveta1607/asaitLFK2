@@ -22,9 +22,17 @@ class UserResponse(BaseModel):
 
 # --- Users ---
 class UserUpdateRequest(BaseModel):
-    """Запрос на обновление профиля (email)"""
+    """
+    Этот класс создаётся, чтобы:
+    - валидировать запрос на обновление профиля пользователя;
+    - позволить менять e-mail, имя, фамилию и телефон одной операцией.
+    """
+
     userId: str
     email: str
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    phone: Optional[str] = None
 
     @field_validator("email")
     @classmethod

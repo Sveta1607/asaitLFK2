@@ -505,8 +505,14 @@ const ProfilePage: React.FC<{
     );
   }
 
-  // Локальное состояние для редактируемого поля e-mail
+  // Локальное состояние для редактируемых полей профиля.
+  // Нужен, чтобы:
+  // - позволить менять e-mail, имя, фамилию и телефон;
+  // - не трогать объект currentUser до успешного сохранения.
   const [email, setEmail] = useState(currentUser.email);
+  const [firstName, setFirstName] = useState(currentUser.firstName ?? '');
+  const [lastName, setLastName] = useState(currentUser.lastName ?? '');
+  const [phone, setPhone] = useState(currentUser.phone ?? '');
   // Локальное состояние для текстовой ошибки (если e-mail не заполнен)
   const [error, setError] = useState<string | null>(null);
 
@@ -521,7 +527,12 @@ const ProfilePage: React.FC<{
     setError(null);
     setIsLoading(true);
     try {
-      const updated = await apiUpdateUser(currentUser.id, email.trim());
+      const updated = await apiUpdateUser(currentUser.id, {
+        email: email.trim(),
+        firstName: firstName.trim() || undefined,
+        lastName: lastName.trim() || undefined,
+        phone: phone.trim() || undefined
+      });
       onUpdateUser(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка при сохранении');
@@ -541,24 +552,33 @@ const ProfilePage: React.FC<{
         </p>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid gap-3 md:grid-cols-2">
-            {/* Блок с неизменяемой информацией о пользователе */}
+            {/* Блок редактируемых ФИО и телефона */}
             <div>
               <label className="mb-1 block text-xs text-slate-600">Имя</label>
-              <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                {currentUser.firstName ?? '—'}
-              </div>
+              <input
+                type="text"
+                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs text-slate-600">Фамилия</label>
-              <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                {currentUser.lastName ?? '—'}
-              </div>
+              <input
+                type="text"
+                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs text-slate-600">Телефон</label>
-              <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                {currentUser.phone ?? '—'}
-              </div>
+              <input
+                type="tel"
+                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs text-slate-600">Роль</label>
@@ -609,6 +629,7 @@ const BookingPage: React.FC<{
   slotsError?: string | null;
   onCreateBooking: (payload: {
     slotId: string;
+    specialistId: string;
     date: string;
     time: string;
     lastName: string;
@@ -618,11 +639,12 @@ const BookingPage: React.FC<{
 }> = ({ currentUser, slots, slotsLoading, slotsError, onCreateBooking }) => {
   const navigate = useNavigate();
 
-  // Даты, на которые у специалиста spec1 есть слоты (для выбора при записи)
+  // Блок: список дат с доступными слотами.
+  // Нужен, чтобы:
+  // - строить выпадающий список только по реально существующим слотам;
+  // - поддерживать расписание сразу нескольких специалистов без жёсткого id.
   const availableDates = useMemo(() => {
-    const dates = new Set(
-      slots.filter((s) => s.specialistId === 'spec1').map((s) => s.date)
-    );
+    const dates = new Set(slots.map((s) => s.date));
     return Array.from(dates).sort();
   }, [slots]);
 
@@ -668,12 +690,12 @@ const BookingPage: React.FC<{
     );
   }
 
-  // Фильтруем слоты только для выбранной даты и специалиста spec1
+  // Блок: слоты на выбранную дату.
+  // Нужен, чтобы:
+  // - показывать пациенту все времена приёма на эту дату независимо от специалиста;
+  // - брать specialistId непосредственно из выбранного слота при создании записи.
   const dateSlots = useMemo(
-    () =>
-      slots.filter(
-        (s) => s.date === selectedDate && s.specialistId === 'spec1'
-      ),
+    () => slots.filter((s) => s.date === selectedDate),
     [slots, selectedDate]
   );
 
@@ -687,6 +709,7 @@ const BookingPage: React.FC<{
     try {
       await onCreateBooking({
         slotId: selectedSlot.id,
+        specialistId: selectedSlot.specialistId,
         date: selectedDate,
         time: selectedTime,
         lastName: lastName || 'Пациент',
@@ -971,9 +994,17 @@ const MyBookingsPage: React.FC<{
                   key={b.id}
                   className="flex items-center justify-between rounded-md border px-3 py-2"
                 >
-                  <span className="text-xs text-slate-700">
-                    {new Date(b.date).toLocaleDateString('ru-RU')}, {b.time}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-slate-700">
+                      {new Date(b.date).toLocaleDateString('ru-RU')}, {b.time}
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Специалист:{' '}
+                      {(b.specialistLastName || b.specialistFirstName)
+                        ? `${b.specialistLastName ?? ''} ${b.specialistFirstName ?? ''}`.trim()
+                        : 'не указан'}
+                    </span>
+                  </div>
                   <span className="text-[11px] text-slate-500">Статус: активна</span>
                 </li>
               ))}
@@ -1648,7 +1679,10 @@ const App: React.FC = () => {
     setLoadingSlots(true);
     setErrorSlots(null);
     try {
-      const specId = currentUser.role === 'specialist' ? currentUser.id : 'spec1';
+      // Этот блок создаётся, чтобы:
+      // - для специалиста загружать только его собственные слоты;
+      // - для пациента загружать слоты всех специалистов сразу (без жёсткого id).
+      const specId = currentUser.role === 'specialist' ? currentUser.id : undefined;
       const data = await apiGetSlots(currentUser.id, specId);
       setSlots(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -1695,6 +1729,7 @@ const App: React.FC = () => {
 
   const handleCreateBookingByUser = useCallback(async (payload: {
     slotId: string;
+    specialistId: string;
     date: string;
     time: string;
     lastName: string;
@@ -1703,7 +1738,7 @@ const App: React.FC = () => {
   }) => {
     if (!currentUser) return;
     await apiCreateBookingByPatient(currentUser.id, {
-      specialistId: 'spec1',
+      specialistId: payload.specialistId,
       slotId: payload.slotId,
       firstName: payload.firstName,
       lastName: payload.lastName,

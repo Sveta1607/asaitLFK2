@@ -46,11 +46,17 @@ export async function apiAuth(
 }
 
 // --- Users ---
-export async function apiUpdateUser(userId: string, email: string): Promise<User> {
+export async function apiUpdateUser(
+  userId: string,
+  body: { email: string; firstName?: string; lastName?: string; phone?: string }
+): Promise<User> {
+  // Этот блок создаётся, чтобы:
+  // - отправлять на бэкенд все редактируемые поля профиля;
+  // - использовать один и тот же метод для пациента и специалиста.
   const res = await fetch(`${API_BASE}/users/me`, {
     method: 'PATCH',
     headers: headers(userId),
-    body: JSON.stringify({ userId, email }),
+    body: JSON.stringify({ userId, ...body }),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
@@ -94,12 +100,18 @@ export async function apiUpdateNews(
 // --- Slots ---
 export async function apiGetSlots(
   userId: string,
-  specialistId: string,
+  specialistId?: string,
   date?: string
 ): Promise<TimeSlot[]> {
-  const params = new URLSearchParams({ specialistId });
+  // Этот блок создаётся, чтобы:
+  // - уметь запрашивать слоты как по конкретному специалисту, так и по всем сразу;
+  // - не плодить отдельные эндпоинты для пациентов и специалистов.
+  const params = new URLSearchParams();
+  if (specialistId) params.set('specialistId', specialistId);
   if (date) params.set('date', date);
-  const res = await fetch(`${API_BASE}/slots?${params}`, { headers: headers(userId) });
+  const query = params.toString();
+  const url = query ? `${API_BASE}/slots?${query}` : `${API_BASE}/slots`;
+  const res = await fetch(url, { headers: headers(userId) });
   if (!res.ok) throw new Error(await parseError(res));
   const items = (await res.json()) as TimeSlot[];
   return items;
