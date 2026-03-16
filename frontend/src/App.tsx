@@ -938,7 +938,8 @@ const MyBookingsPage: React.FC<{
   bookings: Booking[];
   isLoading?: boolean;
   error?: string | null;
-}> = ({ currentUser, bookings, isLoading, error }) => {
+  onCancelBooking: (bookingId: string) => Promise<void>;
+}> = ({ currentUser, bookings, isLoading, error, onCancelBooking }) => {
   // Фильтруем только активные записи текущего пациента
   const userBookings = useMemo(
     () =>
@@ -992,7 +993,7 @@ const MyBookingsPage: React.FC<{
               {userBookings.map((b) => (
                 <li
                   key={b.id}
-                  className="flex items-center justify-between rounded-md border px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
                 >
                   <div className="flex flex-col">
                     <span className="text-xs text-slate-700">
@@ -1005,7 +1006,23 @@ const MyBookingsPage: React.FC<{
                         : 'не указан'}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-500">Статус: активна</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-slate-500">Статус: активна</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        // Этот блок создаётся, чтобы:
+                        // - запросить у пациента подтверждение отмены записи;
+                        // - избежать случайного нажатия на кнопку "Отменить".
+                        const ok = window.confirm('Вы уверены, что хотите отменить эту запись?');
+                        if (!ok) return;
+                        await onCancelBooking(b.id);
+                      }}
+                      className="rounded-md border border-red-200 px-3 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50"
+                    >
+                      Отменить
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -1748,6 +1765,16 @@ const App: React.FC = () => {
     await fetchBookings();
   }, [currentUser, fetchSlots, fetchBookings]);
 
+  const handleCancelBookingByUser = useCallback(async (bookingId: string) => {
+    // Этот обработчик создаётся, чтобы:
+    // - позволить пациенту отменять свои записи из раздела "Мои записи";
+    // - после отмены освежать слоты и список записей, чтобы освободившийся слот появился у специалиста.
+    if (!currentUser) return;
+    await apiCancelBooking(currentUser.id, bookingId);
+    await fetchSlots();
+    await fetchBookings();
+  }, [currentUser, fetchSlots, fetchBookings]);
+
   const handleCreateBookingBySpecialist = useCallback(async (payload: {
     date: string;
     time: string;
@@ -1864,6 +1891,7 @@ const App: React.FC = () => {
               bookings={bookings}
               isLoading={loadingBookings}
               error={errorBookings}
+              onCancelBooking={handleCancelBookingByUser}
             />
           }
         />
