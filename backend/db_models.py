@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -26,28 +27,48 @@ class User(Base):
     Эта модель создаётся, чтобы:
     - хранить пациентов и специалистов в одной таблице с разделением по роли;
     - иметь строковый id, совместимый с текущим фронтендом (u-*, spec-*);
+    - интегрироваться с Clerk через внешнее поле clerk_id;
     - предоставлять связи с новостями, слотами и записями.
     """
 
     __tablename__ = "users"
 
+    # Это поле создаётся, чтобы хранить строковый идентификатор пользователя,
+    # совместимый с текущим фронтендом (u-*, spec-*), и использовать его в X-User-Id / JWT-пейлоаде.
     id = Column(String, primary_key=True, index=True)
-    role = Column(String, nullable=False)  # "user" или "specialist"
+    # Это поле создаётся, чтобы хранить роль приложения (user, specialist, superuser),
+    # на основе которой бэкенд и фронтенд ограничивают доступ к эндпоинтам.
+    role = Column(String, nullable=False)  # "user", "specialist" или "superuser"
+    # Это поле создаётся, чтобы связать локального пользователя с аккаунтом в Clerk по sub из JWT.
+    clerk_id = Column(String, unique=True, index=True, nullable=True)
+    # Это поле создаётся, чтобы хранить логин пользователя (username) с валидацией на латиницу.
+    username = Column(String, unique=True, index=True, nullable=True)
+    # Это поле создаётся, чтобы хранить основной e-mail пользователя.
     email = Column(String, nullable=False, unique=True, index=True)
+    # Это поле создаётся, чтобы хранить имя пользователя для отображения и записей.
     first_name = Column(String, nullable=True)
+    # Это поле создаётся, чтобы хранить фамилию пользователя.
     last_name = Column(String, nullable=True)
+    # Это поле создаётся, чтобы хранить телефон пользователя (опционально).
     phone = Column(String, nullable=True)
+    # Это поле создаётся, чтобы пометить профиль как одобренный администратором перед доступом к ряду операций.
+    approved = Column(Boolean, default=True, nullable=False)
+    # Это поле создаётся, чтобы хранить дату создания пользователя.
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    # Это поле создаётся, чтобы хранить дату последнего обновления записи пользователя.
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    # Отношения для удобного доступа.
+    # Это отношение создаётся, чтобы получть список новостей, опубликованных специалистом.
     news_items = relationship("News", back_populates="specialist", cascade="all, delete-orphan")
+    # Это отношение создаётся, чтобы получить список слотов расписания, принадлежащих специалисту.
     slots = relationship("Slot", back_populates="specialist", cascade="all, delete-orphan")
+    # Это отношение создаётся, чтобы получить список записей, где пользователь выступает пациентом.
     bookings_as_patient = relationship(
         "Booking",
         back_populates="patient",
         foreign_keys="Booking.user_id",
     )
+    # Это отношение создаётся, чтобы получить список записей, где пользователь выступает специалистом.
     bookings_as_specialist = relationship(
         "Booking",
         back_populates="specialist",

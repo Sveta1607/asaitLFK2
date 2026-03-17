@@ -14,7 +14,7 @@ import jwt
 import requests
 from fastapi import Depends, Header, HTTPException, status
 from jwcrypto import jwk
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from db import get_db
@@ -146,6 +146,13 @@ def get_current_user(
     stmt = select(User).where(User.clerk_id == clerk_id)
     user = db.execute(stmt).scalar_one_or_none()
     if user:
+        # Этот блок создаётся, чтобы установить session variables для RLS в Postgres.
+        # На SQLite set_config недоступен — игнорируем ошибку.
+        try:
+            db.execute(text("SELECT set_config('app.current_user_id', :uid, true)"), {"uid": str(user.id)})
+            db.execute(text("SELECT set_config('app.current_role', :role, true)"), {"role": user.role})
+        except Exception:
+            pass
         return user
 
     # Привязка суперюзера по email (один раз): суперюзер с clerk_id=None и совпадающим email
@@ -161,11 +168,16 @@ def get_current_user(
             db.add(superuser)
             db.commit()
             db.refresh(superuser)
+            try:
+                db.execute(text("SELECT set_config('app.current_user_id', :uid, true)"), {"uid": str(superuser.id)})
+                db.execute(text("SELECT set_config('app.current_role', :role, true)"), {"role": superuser.role})
+            except Exception:
+                pass
             return superuser
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Профиль не найден. Вызовите POST /api/auth/sync-profile с ролью и ФИО.",
+        detail="Профиль не найден. Вызовите POST /api/users/sync-from-clerk с ролью и username.",
     )
 
 

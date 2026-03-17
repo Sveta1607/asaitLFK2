@@ -2,12 +2,13 @@
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Header, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from auth_deps import RequireUser, RequireSpecialist
 from db import get_db
-from db_models import User, Slot, Booking
+from db_models import Slot, Booking
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -17,30 +18,6 @@ def _generate_cancel_token() -> str:
     return uuid.uuid4().hex[:12]
 
 
-def _require_auth(
-    db: Session,
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
-) -> User:
-    """
-    Эта функция создаётся, чтобы:
-    - проверить авторизацию по X-User-Id;
-    - вернуть пользователя из БД или выбросить ошибку.
-    """
-    if not x_user_id:
-        raise HTTPException(
-            status_code=401,
-            detail={"detail": "Требуется авторизация.", "code": "UNAUTHORIZED"},
-        )
-    stmt = select(User).where(User.id == x_user_id)
-    user = db.execute(stmt).scalar_one_or_none()
-    if not user:
-        raise HTTPException(
-            status_code=404,
-            detail={"detail": "Пользователь не найден.", "code": "USER_NOT_FOUND"},
-        )
-    return user
-
-
 def _next_booking_id() -> str:
     """Генерация строкового идентификатора записи с префиксом b-."""
     return f"b-{int(__import__('time').time() * 1000)}"
@@ -48,13 +25,13 @@ def _next_booking_id() -> str:
 
 @router.get("")
 def list_bookings(
+    current_user: RequireUser,
     userId: Optional[str] = Query(None),
     specialistId: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
     """Список записей: ?userId= — свои (пациент), ?specialistId= — расписание специалиста."""
-    user = _require_auth(db, x_user_id)
+    user = current_user
     stmt = select(Booking)
     if userId:
         if user.role != "user" or userId != user.id:
@@ -104,16 +81,17 @@ def list_bookings(
 @router.post("", status_code=201)
 def create_booking(
     body: dict,  # Union[BookingCreateByPatientRequest, BookingCreateBySpecialistRequest]
+    current_user: RequireUser,
     db: Session = Depends(get_db),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
-    """Создать запись: от пациента (с userId, slotId) или от специалиста (без userId)."""
-    user = _require_auth(db, x_user_id)
+    """Создать запись: от пациента (с slotId) или от специалиста (без slotId)."""
+    user = current_user
 
-    is_patient = "userId" in body and "slotId" in body
+    # Пациент отправляет slotId; специалист — date, time, specialistId без slotId.
+    is_patient = "slotId" in body
     if is_patient:
-        # Пациент записывается сам.
-        if user.role != "user" or body.get("userId") != user.id:
+        # Пациент записывается сам. userId берём из JWT, не из тела.
+        if user.role != "user":
             raise HTTPException(
                 status_code=403,
                 detail={"detail": "Только пациент может записаться от своего имени.", "code": "FORBIDDEN"},
@@ -137,7 +115,7 @@ def create_booking(
             id=_next_booking_id(),
             slot_id=slot.id,
             specialist_id=slot.specialist_id,
-            user_id=body["userId"],
+            user_id=user.id,
             date=slot.date,
             time=slot.time,
             last_name=(body.get("lastName") or "").strip() or "Пациент",
@@ -203,12 +181,12 @@ def create_booking(
 @router.patch("/{booking_id}/cancel")
 def cancel_booking(
     booking_id: str,
+    current_user: RequireUser,
     body: Optional[dict] = None,
     db: Session = Depends(get_db),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
     """Отменить запись — пациент (свою) или специалист."""
-    user = _require_auth(db, x_user_id)
+    user = current_user
     stmt = select(Booking).where(Booking.id == booking_id)
     booking = db.execute(stmt).scalar_one_or_none()
     if not booking:

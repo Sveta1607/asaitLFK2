@@ -1,57 +1,16 @@
 # routers/slots.py — CRUD слотов (просмотр — авторизованные, управление — специалист)
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Header, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from auth_deps import RequireUser, RequireSpecialist
 from db import get_db
-from db_models import User, Slot
+from db_models import Slot
 from models import SlotCreateRequest, SlotBatchCreateRequest, SlotResponse
 
 router = APIRouter(prefix="/slots", tags=["slots"])
-
-
-def _require_auth(
-    db: Session,
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
-) -> User:
-    """
-    Эта функция создаётся, чтобы:
-    - проверить наличие заголовка X-User-Id;
-    - найти пользователя в БД или вернуть ошибку.
-    """
-    if not x_user_id:
-        raise HTTPException(
-            status_code=401,
-            detail={"detail": "Требуется авторизация для просмотра слотов.", "code": "UNAUTHORIZED"},
-        )
-    stmt = select(User).where(User.id == x_user_id)
-    user = db.execute(stmt).scalar_one_or_none()
-    if not user:
-        raise HTTPException(
-            status_code=404,
-            detail={"detail": "Пользователь не найден.", "code": "USER_NOT_FOUND"},
-        )
-    return user
-
-
-def _require_specialist(
-    db: Session,
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
-) -> User:
-    """
-    Эта функция создаётся, чтобы:
-    - убедиться, что пользователь авторизован;
-    - проверить, что его роль — specialist.
-    """
-    user = _require_auth(db, x_user_id)
-    if user.role != "specialist":
-        raise HTTPException(
-            status_code=403,
-            detail={"detail": "Управление слотами доступно только специалисту.", "code": "FORBIDDEN"},
-        )
-    return user
 
 
 def _next_slot_id() -> str:
@@ -61,20 +20,20 @@ def _next_slot_id() -> str:
 
 @router.get("", response_model=list[SlotResponse])
 def list_slots(
+    current_user: RequireUser,
     specialistId: Optional[str] = Query(
         None,
         description="ID специалиста; если не указан, возвращаются слоты всех специалистов",
     ),
     date: Optional[str] = Query(None, description="Фильтр по дате YYYY-MM-DD"),
     db: Session = Depends(get_db),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
     """
     Этот обработчик создаётся, чтобы:
     - отдавать список слотов как по конкретному специалисту, так и по всем сразу;
-    - позволить пациентам видеть расписание нескольких специалистов без дополнительных ручек.
+    - позволить пациентам видеть расписание нескольких специалистов без дополнительных ручек;
+    - опираться на JWT Clerk (RequireUser), а не на заголовок X-User-Id.
     """
-    _require_auth(db, x_user_id)
     stmt = select(Slot)
     if specialistId:
         stmt = stmt.where(Slot.specialist_id == specialistId)
@@ -97,11 +56,11 @@ def list_slots(
 @router.post("", response_model=SlotResponse, status_code=201)
 def create_slot(
     body: SlotCreateRequest,
+    current_user: RequireSpecialist,
     db: Session = Depends(get_db),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
     """Добавить один слот — только специалист."""
-    user = _require_specialist(db, x_user_id)
+    user = current_user
     if body.specialistId != user.id:
         raise HTTPException(
             status_code=403,
@@ -141,11 +100,11 @@ def create_slot(
 @router.post("/batch", response_model=list[SlotResponse], status_code=201)
 def create_slots_batch(
     body: SlotBatchCreateRequest,
+    current_user: RequireSpecialist,
     db: Session = Depends(get_db),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
     """Добавить несколько слотов — только специалист."""
-    user = _require_specialist(db, x_user_id)
+    user = current_user
     if body.specialistId != user.id:
         raise HTTPException(
             status_code=403,
@@ -183,11 +142,11 @@ def create_slots_batch(
 @router.delete("/{slot_id}", status_code=204)
 def delete_slot(
     slot_id: str,
+    current_user: RequireSpecialist,
     db: Session = Depends(get_db),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
     """Удалить слот (только свободный) — только специалист."""
-    user = _require_specialist(db, x_user_id)
+    user = current_user
     stmt = select(Slot).where(Slot.id == slot_id, Slot.specialist_id == user.id)
     slot = db.execute(stmt).scalar_one_or_none()
     if not slot:

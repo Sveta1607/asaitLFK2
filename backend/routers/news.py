@@ -2,39 +2,16 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from auth_deps import RequireSpecialist
 from db import get_db
-from db_models import User, News
+from db_models import News
 from models import NewsCreateRequest, NewsUpdateRequest, NewsItemResponse
 
 router = APIRouter(prefix="/news", tags=["news"])
-
-
-def _require_specialist(
-    db: Session,
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
-) -> User:
-    """
-    Эта функция создаётся, чтобы:
-    - проверить заголовок X-User-Id;
-    - убедиться, что пользователь существует и имеет роль specialist.
-    """
-    if not x_user_id:
-        raise HTTPException(
-            status_code=401,
-            detail={"detail": "Требуется авторизация специалиста.", "code": "UNAUTHORIZED"},
-        )
-    stmt = select(User).where(User.id == x_user_id)
-    user = db.execute(stmt).scalar_one_or_none()
-    if not user or user.role != "specialist":
-        raise HTTPException(
-            status_code=403,
-            detail={"detail": "Доступ только для специалиста.", "code": "FORBIDDEN"},
-        )
-    return user
 
 
 @router.get("", response_model=list[NewsItemResponse])
@@ -58,11 +35,10 @@ def list_news(db: Session = Depends(get_db)):
 @router.post("", response_model=NewsItemResponse, status_code=201)
 def create_news(
     body: NewsCreateRequest,
+    user: RequireSpecialist,
     db: Session = Depends(get_db),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
-    """Добавить новость — только специалист."""
-    user = _require_specialist(db, x_user_id)
+    """Добавить новость — только специалист (JWT Clerk, RequireSpecialist)."""
     new_id = f"n-{int(datetime.now().timestamp() * 1000)}"
     now = datetime.utcnow()
     item = News(
@@ -93,11 +69,10 @@ def create_news(
 def update_news(
     news_id: str,
     body: NewsUpdateRequest,
+    user: RequireSpecialist,
     db: Session = Depends(get_db),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
-    """Редактировать новость — только специалист."""
-    _require_specialist(db, x_user_id)
+    """Редактировать новость — только специалист (JWT Clerk)."""
     stmt = select(News).where(News.id == news_id)
     item = db.execute(stmt).scalar_one_or_none()
     if not item:
@@ -128,11 +103,10 @@ def update_news(
 @router.delete("/{news_id}", status_code=204)
 def delete_news(
     news_id: str,
+    user: RequireSpecialist,
     db: Session = Depends(get_db),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
-    """Удалить новость — только специалист."""
-    _require_specialist(db, x_user_id)
+    """Удалить новость — только специалист (JWT Clerk)."""
     stmt = select(News).where(News.id == news_id)
     item = db.execute(stmt).scalar_one_or_none()
     if not item:

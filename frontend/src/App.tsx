@@ -1,8 +1,8 @@
 // App.tsx — корневой компонент приложения: навигация, страницы и базовая логика
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { SignIn, SignOutButton, SignUp } from '@clerk/clerk-react';
 import {
-  apiAuth,
   apiCancelBooking,
   apiCreateBookingByPatient,
   apiCreateBookingBySpecialist,
@@ -14,26 +14,13 @@ import {
   apiGetSlots,
   apiAddNews,
   apiUpdateNews,
-  apiUpdateUser
+  apiUpdateUser,
 } from './api';
-import {
-  Booking,
-  NewsItem,
-  TimeSlot,
-  User,
-  UserRole,
-  loadCurrentUserFromStorage,
-  saveCurrentUserToStorage
-} from './mockData';
+import { useClerkAuth, RoleSelectForm } from './ClerkAuth';
+import type { Booking, NewsItem, TimeSlot, User } from './mockData';
 
-// Тип для простой формы логина/регистрации
-type AuthMode = 'login' | 'register';
-
-// Компонент шапки сайта с навигацией по ролям, ссылкой на профиль и авторизацией
-const Header: React.FC<{
-  currentUser: User | null;
-  onLogout: () => void;
-}> = ({ currentUser, onLogout }) => {
+// Компонент шапки сайта с навигацией по ролям и кнопкой выхода (Clerk SignOutButton)
+const Header: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
   // location нужен, чтобы подсвечивать активные ссылки при необходимости
   const location = useLocation();
 
@@ -139,19 +126,20 @@ const Header: React.FC<{
             </Link>
           )}
 
-          {/* Если пользователь авторизован — показываем его роль и кнопку выхода */}
+          {/* Если пользователь авторизован — показываем его роль и кнопку выхода через Clerk */}
           {currentUser && (
             <>
               <span className="text-xs text-slate-500">
-                {currentUser.role === 'user' ? 'Пациент' : 'Специалист'}
+                {currentUser.role === 'user' ? 'Пациент' : currentUser.role === 'specialist' ? 'Специалист' : 'Админ'}
               </span>
-              <button
-                type="button"
-                onClick={onLogout}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100"
-              >
-                Выйти
-              </button>
+              <SignOutButton>
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100"
+                >
+                  Выйти
+                </button>
+              </SignOutButton>
             </>
           )}
         </nav>
@@ -293,202 +281,12 @@ const HomePage: React.FC<{
   );
 };
 
-// Страница логина/регистрации с выбором роли
-const AuthPage: React.FC<{
-  mode: AuthMode;
-  onAuth: (user: User) => void;
-}> = ({ mode, onAuth }) => {
-  const navigate = useNavigate();
-  const [role, setRole] = useState<UserRole>('user');
-  const [email, setEmail] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const isUserRole = role === 'user';
-  // Валидация: email — формат test@test.ru, только латиница; телефон — ровно 12 символов (+7 и 10 цифр)
-  const emailValid = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email.trim());
-  const phoneValid = phone.length === 12 && phone.startsWith('+7') && /^\+7\d{10}$/.test(phone);
-  const isFormInvalid =
-    !email.trim() ||
-    !firstName.trim() ||
-    !lastName.trim() ||
-    !emailValid ||
-    (isUserRole && (!phone.trim() || !phoneValid));
-
-  // Ограничение ввода email: только латиница, цифры, @, ., -, _
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value.replace(/[^a-zA-Z0-9@._-]/g, '');
-    setEmail(v);
-  };
-
-  // Телефон: автодобавление +7, макс 12 символов (+7 и 10 цифр)
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let v = e.target.value.replace(/\D/g, '');
-    if (v.startsWith('8')) v = v.slice(1);
-    if (v.startsWith('7')) v = v.slice(1);
-    v = v.slice(0, 10);
-    setPhone(v ? '+7' + v : '');
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isFormInvalid) {
-      setError('Пожалуйста, заполните все обязательные поля.');
-      return;
-    }
-    setError(null);
-    setIsLoading(true);
-    try {
-      const user = await apiAuth(mode, {
-        email: email.trim(),
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        role,
-        phone: isUserRole ? phone.trim() : undefined
-      });
-      onAuth(user);
-      if (role === 'user') navigate('/book');
-      else navigate('/specialist/schedule');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка при входе');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    // Центрируем карточку авторизации по центру экрана
-    <main className="flex min-h-[70vh] items-center justify-center bg-slate-50 px-4 py-6">
-      {/* Карточка с формой входа/регистрации */}
-      <div className="w-full max-w-md rounded-xl border bg-white p-6 shadow-sm">
-        <h1 className="mb-4 text-xl font-semibold text-slate-900">
-          {mode === 'login' ? 'Вход в систему' : 'Регистрация'}
-        </h1>
-
-        {/* Переключатель роли: пациент / специалист */}
-        <div className="mb-4 flex gap-2 text-xs">
-          <button
-            type="button"
-            onClick={() => setRole('user')}
-            className={
-              role === 'user'
-                ? 'flex-1 rounded-md bg-sky-600 px-3 py-2 font-medium text-white'
-                : 'flex-1 rounded-md border border-slate-200 px-3 py-2 text-slate-700'
-            }
-          >
-            Пациент
-          </button>
-          <button
-            type="button"
-            onClick={() => setRole('specialist')}
-            className={
-              role === 'specialist'
-                ? 'flex-1 rounded-md bg-sky-600 px-3 py-2 font-medium text-white'
-                : 'flex-1 rounded-md border border-slate-200 px-3 py-2 text-slate-700'
-            }
-          >
-            Специалист
-          </button>
-        </div>
-
-        {/* Форма авторизации/регистрации (упрощённая, без реальных паролей) */}
-        <form onSubmit={handleSubmit} className="space-y-3 text-sm">
-          <div>
-            <label className="mb-1 block text-xs text-slate-600">
-              E-mail <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
-              placeholder="test@test.ru"
-              value={email}
-              onChange={handleEmailChange}
-              autoComplete="email"
-            />
-            {email.trim() && !emailValid && (
-              <p className="mt-0.5 text-[11px] text-red-600">Формат: test@test.ru, только латинские буквы</p>
-            )}
-          </div>
-
-          {/* Для пациента и специалиста позволяем ввести ФИО и телефон (опционально) */}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="mb-1 block text-xs text-slate-600">
-                Имя <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
-            </div>
-            <div className="flex-1">
-              <label className="mb-1 block text-xs text-slate-600">
-                Фамилия <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {role === 'user' && (
-            <div>
-              <label className="mb-1 block text-xs text-slate-600">
-                Телефон <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
-                placeholder="+79001234567"
-                value={phone}
-                onChange={handlePhoneChange}
-                maxLength={12}
-              />
-              {phone && !phoneValid && (
-                <p className="mt-0.5 text-[11px] text-red-600">Введите +7 и 10 цифр (всего 12 символов)</p>
-              )}
-            </div>
-          )}
-
-          {/* Блок отображения ошибки валидации или сетевой ошибки */}
-          {error && (
-            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              {error}
-            </p>
-          )}
-
-          {/* Кнопка отправки — disabled при загрузке или невалидной форме */}
-          <button
-            type="submit"
-            disabled={isFormInvalid || isLoading}
-            className="mt-2 w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
-          >
-            {isLoading ? 'Загрузка...' : mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
-          </button>
-
-          {/* Подпись о том, что это учебный прототип без реальной безопасности */}
-          <p className="mt-2 text-[11px] text-slate-400">
-            В этой версии логика авторизации упрощена и использует только моковые данные.
-          </p>
-        </form>
-      </div>
-    </main>
-  );
-};
-
 // Страница профиля: просмотр и изменение части данных пользователя
 const ProfilePage: React.FC<{
   currentUser: User | null;
-  onUpdateUser: (user: User) => void;
-}> = ({ currentUser, onUpdateUser }) => {
+  getToken: () => Promise<string | null>;
+  onUpdateUser: () => void;
+}> = ({ currentUser, getToken, onUpdateUser }) => {
   // Если пользователь не авторизован — показываем простое сообщение
   if (!currentUser) {
     return (
@@ -527,7 +325,9 @@ const ProfilePage: React.FC<{
     setError(null);
     setIsLoading(true);
     try {
-      const updated = await apiUpdateUser(currentUser.id, {
+      const token = await getToken();
+      if (!token) throw new Error('Нет токена авторизации');
+      const updated = await apiUpdateUser(token, {
         email: email.trim(),
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
@@ -1666,8 +1466,11 @@ const SpecialistNewsPage: React.FC<{
 };
 
 // Корневой компонент App — хранит состояние, загружает данные через API
+// Этот блок создаётся, чтобы:
+// - получать текущего пользователя через useClerkAuth (Clerk + sync-from-clerk);
+// - загружать новости, слоты и записи через API с Bearer-токеном.
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(loadCurrentUserFromStorage);
+  const { user: currentUser, loading: authLoading, needsRoleSelect, roleSelectEmail, completeRoleSelect, getToken, refreshUser } = useClerkAuth();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -1693,36 +1496,37 @@ const App: React.FC = () => {
 
   const fetchSlots = useCallback(async () => {
     if (!currentUser) return;
+    const token = await getToken();
+    if (!token) return;
     setLoadingSlots(true);
     setErrorSlots(null);
     try {
-      // Этот блок создаётся, чтобы:
-      // - для специалиста загружать только его собственные слоты;
-      // - для пациента загружать слоты всех специалистов сразу (без жёсткого id).
       const specId = currentUser.role === 'specialist' ? currentUser.id : undefined;
-      const data = await apiGetSlots(currentUser.id, specId);
+      const data = await apiGetSlots(token, specId);
       setSlots(Array.isArray(data) ? data : []);
     } catch (err) {
       setErrorSlots(err instanceof Error ? err.message : 'Не удалось загрузить слоты');
     } finally {
       setLoadingSlots(false);
     }
-  }, [currentUser]);
+  }, [currentUser, getToken]);
 
   const fetchBookings = useCallback(async () => {
     if (!currentUser) return;
+    const token = await getToken();
+    if (!token) return;
     setLoadingBookings(true);
     setErrorBookings(null);
     try {
       const params = currentUser.role === 'user' ? { userId: currentUser.id } : { specialistId: currentUser.id };
-      const data = await apiGetBookings(currentUser.id, params);
+      const data = await apiGetBookings(token, params);
       setBookings(Array.isArray(data) ? data : []);
     } catch (err) {
       setErrorBookings(err instanceof Error ? err.message : 'Не удалось загрузить записи');
     } finally {
       setLoadingBookings(false);
     }
-  }, [currentUser]);
+  }, [currentUser, getToken]);
 
   useEffect(() => { fetchNews(); }, [fetchNews]);
 
@@ -1740,10 +1544,6 @@ const App: React.FC = () => {
     }
   }, [currentUser, fetchSlots, fetchBookings]);
 
-  useEffect(() => { saveCurrentUserToStorage(currentUser); }, [currentUser]);
-
-  const handleLogout = () => setCurrentUser(null);
-
   const handleCreateBookingByUser = useCallback(async (payload: {
     slotId: string;
     specialistId: string;
@@ -1754,7 +1554,9 @@ const App: React.FC = () => {
     phone?: string;
   }) => {
     if (!currentUser) return;
-    await apiCreateBookingByPatient(currentUser.id, {
+    const token = await getToken();
+    if (!token) return;
+    await apiCreateBookingByPatient(token, {
       specialistId: payload.specialistId,
       slotId: payload.slotId,
       firstName: payload.firstName,
@@ -1763,17 +1565,16 @@ const App: React.FC = () => {
     });
     await fetchSlots();
     await fetchBookings();
-  }, [currentUser, fetchSlots, fetchBookings]);
+  }, [currentUser, getToken, fetchSlots, fetchBookings]);
 
   const handleCancelBookingByUser = useCallback(async (bookingId: string) => {
-    // Этот обработчик создаётся, чтобы:
-    // - позволить пациенту отменять свои записи из раздела "Мои записи";
-    // - после отмены освежать слоты и список записей, чтобы освободившийся слот появился у специалиста.
     if (!currentUser) return;
-    await apiCancelBooking(currentUser.id, bookingId);
+    const token = await getToken();
+    if (!token) return;
+    await apiCancelBooking(token, bookingId);
     await fetchSlots();
     await fetchBookings();
-  }, [currentUser, fetchSlots, fetchBookings]);
+  }, [currentUser, getToken, fetchSlots, fetchBookings]);
 
   const handleCreateBookingBySpecialist = useCallback(async (payload: {
     date: string;
@@ -1783,7 +1584,9 @@ const App: React.FC = () => {
     phone?: string;
   }) => {
     if (!currentUser) return;
-    await apiCreateBookingBySpecialist(currentUser.id, {
+    const token = await getToken();
+    if (!token) return;
+    await apiCreateBookingBySpecialist(token, {
       specialistId: currentUser.id,
       date: payload.date,
       time: payload.time,
@@ -1793,53 +1596,75 @@ const App: React.FC = () => {
     });
     await fetchSlots();
     await fetchBookings();
-  }, [currentUser, fetchSlots, fetchBookings]);
+  }, [currentUser, getToken, fetchSlots, fetchBookings]);
+
+  const handleUpdateProfile = useCallback(() => {
+    refreshUser();
+  }, [refreshUser]);
 
   const handleAddNews = useCallback(async (payload: { title: string; excerpt: string; imageUrl: string }) => {
     if (!currentUser) return;
-    const item = await apiAddNews(currentUser.id, payload);
+    const token = await getToken();
+    if (!token) return;
+    const item = await apiAddNews(token, payload);
     setNews((prev) => [item, ...prev]);
-  }, [currentUser]);
+  }, [currentUser, getToken]);
 
   const handleUpdateNews = useCallback(async (payload: { id: string; title: string; excerpt: string; imageUrl: string }) => {
     if (!currentUser) return;
-    const updated = await apiUpdateNews(currentUser.id, payload.id, payload);
+    const token = await getToken();
+    if (!token) return;
+    const updated = await apiUpdateNews(token, payload.id, payload);
     setNews((prev) => prev.map((n) => (n.id === payload.id ? updated : n)));
-  }, [currentUser]);
+  }, [currentUser, getToken]);
 
   const handleCreateSlotBySpecialist = useCallback(async (payload: { date: string; time: string }) => {
     if (!currentUser) return;
-    const slot = await apiCreateSlot(currentUser.id, {
+    const token = await getToken();
+    if (!token) return;
+    const slot = await apiCreateSlot(token, {
       specialistId: currentUser.id,
       date: payload.date,
       time: payload.time
     });
     setSlots((prev) => [...prev, slot]);
-  }, [currentUser]);
+  }, [currentUser, getToken]);
 
   const handleDeleteSlotBySpecialist = useCallback(async (slotId: string) => {
     if (!currentUser) return;
-    await apiDeleteSlot(currentUser.id, slotId);
+    const token = await getToken();
+    if (!token) return;
+    await apiDeleteSlot(token, slotId);
     setSlots((prev) => prev.filter((s) => s.id !== slotId));
-  }, [currentUser]);
+  }, [currentUser, getToken]);
 
   const handleCreateSlotsBatchBySpecialist = useCallback(async (payload: { date: string; times: string[] }) => {
     if (!currentUser) return;
-    const created = await apiCreateSlotsBatch(currentUser.id, {
+    const token = await getToken();
+    if (!token) return;
+    const created = await apiCreateSlotsBatch(token, {
       specialistId: currentUser.id,
       date: payload.date,
       times: payload.times
     });
     if (created.length > 0) setSlots((prev) => [...prev, ...created]);
-  }, [currentUser]);
+  }, [currentUser, getToken]);
+
+  // Когда нужен выбор роли (профиль не синхронизирован с бэкендом)
+  if (needsRoleSelect) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Header currentUser={null} />
+        <main className="flex min-h-[70vh] items-center justify-center px-4 py-6">
+          <RoleSelectForm email={roleSelectEmail} onComplete={completeRoleSelect} />
+        </main>
+      </div>
+    );
+  }
 
   return (
-    // Базовый layout: шапка и область контента
     <div className="min-h-screen bg-slate-50">
-      {/* Шапка с навигацией по ролям */}
-      <Header currentUser={currentUser} onLogout={handleLogout} />
-
-      {/* Область роутинга: разные страницы по URL */}
+      <Header currentUser={currentUser} />
       <Routes>
         <Route
           path="/"
@@ -1854,18 +1679,27 @@ const App: React.FC = () => {
         />
         <Route
           path="/login"
-          element={<AuthPage mode="login" onAuth={setCurrentUser} />}
+          element={
+            <main className="flex min-h-[70vh] items-center justify-center bg-slate-50 px-4 py-6">
+              <SignIn routing="path" path="/login" signUpUrl="/register" afterSignOutUrl="/" />
+            </main>
+          }
         />
         <Route
           path="/register"
-          element={<AuthPage mode="register" onAuth={setCurrentUser} />}
+          element={
+            <main className="flex min-h-[70vh] items-center justify-center bg-slate-50 px-4 py-6">
+              <SignUp routing="path" path="/register" signInUrl="/login" afterSignUpUrl="/" />
+            </main>
+          }
         />
         <Route
           path="/profile"
           element={
             <ProfilePage
               currentUser={currentUser}
-              onUpdateUser={setCurrentUser}
+              getToken={getToken}
+              onUpdateUser={handleUpdateProfile}
             />
           }
         />

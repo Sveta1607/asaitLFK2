@@ -25,10 +25,11 @@ class UserUpdateRequest(BaseModel):
     """
     Этот класс создаётся, чтобы:
     - валидировать запрос на обновление профиля пользователя;
-    - позволить менять e-mail, имя, фамилию и телефон одной операцией.
+    - позволить менять e-mail, имя, фамилию и телефон одной операцией;
+    - userId опционален, т.к. пользователь определяется по JWT Clerk.
     """
 
-    userId: str
+    userId: Optional[str] = None
     email: str
     firstName: Optional[str] = None
     lastName: Optional[str] = None

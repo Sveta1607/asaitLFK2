@@ -5,7 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import init_db
-from routers import auth, users, news, slots, bookings  # noqa: F401
+# auth роутер отключён: регистрация и вход через Clerk (фронтенд).
+from routers import users, news, slots, bookings  # noqa: F401
 
 # Блок: загрузка переменных окружения.
 # Нужен, чтобы прочитать PORT, HOST, DATABASE_URL и дополнительные CORS_ORIGINS из .env.
@@ -41,7 +42,6 @@ app.add_middleware(
 
 # Блок: подключение роутеров под префиксом /api.
 # Нужен, чтобы сгруппировать все эндпоинты и сохранить существующий контракт с фронтендом.
-app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(news.router, prefix="/api")
 app.include_router(slots.router, prefix="/api")
