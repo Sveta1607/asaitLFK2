@@ -4,7 +4,7 @@
 // - после успешной авторизации показывать форму выбора роли и логина (если профиль ещё не синхронизирован);
 // - вызывать apiSyncFromClerk и apiGetMe для получения профиля из бэкенда.
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { apiGetMe, apiSyncFromClerk } from './api';
 import type { User } from './mockData';
 
@@ -128,7 +128,8 @@ function RoleSelectForm({
 // - при наличии сессии Clerk получить токен и загрузить профиль из бэкенда;
 // - при 403 (профиль не найден) вернуть флаг needsRoleSelect и email для формы выбора роли.
 export function useClerkAuth() {
-  const { isSignedIn, getToken, userId, user: clerkUser } = useAuth();
+  const { isSignedIn, getToken, userId } = useAuth();
+  const { user: clerkUser } = useUser();
   const [user, setUser] = useState<User | null>(null);
   const [needsRoleSelect, setNeedsRoleSelect] = useState(false);
   const [roleSelectEmail, setRoleSelectEmail] = useState('');
@@ -152,7 +153,8 @@ export function useClerkAuth() {
       setNeedsRoleSelect(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('Профиль не найден') || msg.includes('sync-profile') || msg.includes('sync')) {
+      // Надёжно определяем необходимость выбора роли по коду 403
+      if (msg === '403') {
         setNeedsRoleSelect(true);
         const email = (clerkUser?.primaryEmailAddress?.emailAddress || '').trim();
         setRoleSelectEmail(email);

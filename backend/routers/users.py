@@ -6,11 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from auth_deps import (
-    RequireUser,
-    RequireSuperuser,
-    get_clerk_payload,
-)
+from auth_deps import RequireSuperuser, RequireUser, get_clerk_payload
 from db import get_db
 from db_models import User
 from models import UserUpdateRequest, UserResponse
@@ -58,19 +54,25 @@ class ClerkSyncRequest(BaseModel):
 
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: RequireUser):
+def get_me(current_user: RequireUser, db: Session = Depends(get_db)):
     """
-    Этот обработчик создаётся, чтобы:
-    - возвращать профиль текущего пользователя на основе JWT Clerk;
-    - не полагаться больше на заголовок X-User-Id.
+    Возвращает профиль текущего пользователя на основе JWT Clerk.
+    Если пользователь ещё не синхронизирован, зависимость поднимет 403.
     """
+    stmt = select(User).where(User.id == current_user.id)
+    user = db.execute(stmt).scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail={"detail": "Пользователь не найден.", "code": "USER_NOT_FOUND"},
+        )
     return UserResponse(
-        id=current_user.id,
-        role=current_user.role,
-        email=current_user.email,
-        firstName=current_user.first_name,
-        lastName=current_user.last_name,
-        phone=current_user.phone,
+        id=user.id,
+        role=user.role,
+        email=user.email,
+        firstName=user.first_name,
+        lastName=user.last_name,
+        phone=user.phone,
     )
 
 

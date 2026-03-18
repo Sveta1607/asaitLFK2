@@ -24,6 +24,12 @@ DATABASE_URL = os.getenv(
     "sqlite:///./lfk_app.db",
 )
 
+# Этот блок создаётся, чтобы:
+# - поддержать переход с psycopg2 на psycopg (v3) без ручного изменения .env;
+# - избежать ошибок несовместимости psycopg2 с новыми версиями Python.
+if DATABASE_URL.startswith("postgresql+psycopg2://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
+
 engine = create_engine(DATABASE_URL, echo=False, future=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
 

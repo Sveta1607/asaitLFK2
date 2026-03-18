@@ -4,13 +4,16 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from db import init_db
-# auth роутер отключён: регистрация и вход через Clerk (фронтенд).
-from routers import users, news, slots, bookings  # noqa: F401
-
 # Блок: загрузка переменных окружения.
 # Нужен, чтобы прочитать PORT, HOST, DATABASE_URL и дополнительные CORS_ORIGINS из .env.
 load_dotenv()
+
+# ВАЖНО: db/engine читают DATABASE_URL при импорте.
+# Этот импорт создаётся ПОСЛЕ load_dotenv(), чтобы DATABASE_URL из backend/.env успел примениться,
+# иначе будет использован дефолтный SQLite и возможны несовпадения схемы (например, нет users.username).
+from db import init_db  # noqa: E402
+# auth роутер отключён: регистрация и вход через Clerk (фронтенд).
+from routers import users, news, slots, bookings  # noqa: F401,E402
 
 app = FastAPI(
     title="API Сайт ЛФК",
@@ -19,23 +22,13 @@ app = FastAPI(
 )
 
 # Блок: настройка CORS для dev-среды.
-# Нужен, чтобы фронтенд на Vite (localhost:5173 и др.) мог обращаться к API.
-origins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://localhost:3000",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-    "http://127.0.0.1:5175",
-    "http://127.0.0.1:3000",
-]
-if os.getenv("CORS_ORIGINS"):
-    origins.extend(os.getenv("CORS_ORIGINS", "").split(","))
+# Нужен, чтобы фронтенд на Vite с любого localhost:порт мог обращаться к API.
+# В разработке можно безопасно разрешить все источники без учёта cookies.
+origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

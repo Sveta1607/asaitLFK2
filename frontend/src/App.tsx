@@ -116,14 +116,15 @@ const Header: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
             </Link>
           )}
 
-          {/* Если пользователь не авторизован — показываем кнопку входа */}
+          {/* Если пользователь не авторизован — показываем ссылку входа, которая ведёт на /login.
+              Здесь используем обычный <a>, чтобы навигация сработала даже при проблемах с Router. */}
           {!currentUser && (
-            <Link
-              to="/login"
+            <a
+              href="/login"
               className="rounded-md bg-sky-600 px-3 py-1.5 text-white hover:bg-sky-700"
             >
               Войти
-            </Link>
+            </a>
           )}
 
           {/* Если пользователь авторизован — показываем его роль и кнопку выхода через Clerk */}
@@ -223,12 +224,12 @@ const HomePage: React.FC<{
               >
                 Записаться на приём
               </button>
-              <Link
-                to="/login"
+              <a
+                href="/login"
                 className="rounded-md border border-sky-200 px-4 py-2 text-sm text-sky-700 hover:bg-sky-50"
               >
                 Войти
-              </Link>
+              </a>
             </div>
           )}
         </div>
@@ -1677,16 +1678,24 @@ const App: React.FC = () => {
             />
           }
         />
+        {/* Роуты авторизации/регистрации Clerk.
+            Используем путь с /*, чтобы обрабатывать вложенные URL вида /login/factor-one. */}
         <Route
-          path="/login"
+          path="/login/*"
           element={
             <main className="flex min-h-[70vh] items-center justify-center bg-slate-50 px-4 py-6">
-              <SignIn routing="path" path="/login" signUpUrl="/register" afterSignOutUrl="/" />
+              <SignIn
+                routing="path"
+                path="/login"
+                signUpUrl="/register"
+                afterSignInUrl="/"
+                afterSignOutUrl="/"
+              />
             </main>
           }
         />
         <Route
-          path="/register"
+          path="/register/*"
           element={
             <main className="flex min-h-[70vh] items-center justify-center bg-slate-50 px-4 py-6">
               <SignUp routing="path" path="/register" signInUrl="/login" afterSignUpUrl="/" />

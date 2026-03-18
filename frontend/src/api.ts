@@ -49,6 +49,10 @@ export async function apiSyncFromClerk(
 // Этот блок создаётся, чтобы получать профиль текущего пользователя по JWT Clerk.
 export async function apiGetMe(token: string): Promise<User> {
   const res = await fetch(`${API_BASE}/users/me`, { headers: headers(token) });
+  // Явно пробрасываем 403 как специальный маркер для показа выбора роли
+  if (res.status === 403) {
+    throw new Error('403');
+  }
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }

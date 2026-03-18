@@ -4,4 +4,5 @@ uvicorn[standard]>=0.27.0
 python-dotenv>=1.0.0
 pydantic>=2.0.0
 SQLAlchemy>=2.0.0
-psycopg2-binary>=2.9.0
+# psycopg (v3) нужен, чтобы стабильно работать с Postgres на новых версиях Python.
+psycopg[binary]>=3.2.0
