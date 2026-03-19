@@ -36,7 +36,9 @@ def _ensure_clerk_env() -> None:
     """
     if os.getenv("CLERK_JWKS_URL"):
         return
-    backend_root = Path(__file__).resolve().parent.parent
+    # Этот блок создаётся, чтобы искать .env внутри /app (корень backend в контейнере),
+    # а не на уровень выше, где файла может не быть.
+    backend_root = Path(__file__).resolve().parent
     env_path = backend_root / ".env"
     if not env_path.exists():
         return
