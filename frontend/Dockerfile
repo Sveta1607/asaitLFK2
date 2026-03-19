@@ -9,7 +9,7 @@ COPY package*.json ./
 RUN npm ci
 
 # Этот блок создаётся, чтобы передать адрес API в сборку фронтенда через env.
-ARG VITE_API_URL=http://backend:3000/api
+ARG VITE_API_URL=https://lfk-b-svetlanagolovchanskaya.amvera.io/api
 ENV VITE_API_URL=${VITE_API_URL}
 
 # Этот блок создаётся, чтобы собрать production-версию фронтенда.

@@ -2,7 +2,7 @@
 import type { Booking, NewsItem, TimeSlot, User } from './mockData';
 
 // Базовый URL API из переменной окружения
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://lfk-b-svetlanagolovchanskaya.amvera.io/api';
 
 // Заголовки для запросов с авторизацией через Bearer-токен Clerk
 function headers(token?: string): Record<string, string> {
