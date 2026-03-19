@@ -12,12 +12,51 @@ import {
   apiGetBookings,
   apiGetNews,
   apiGetSlots,
+  apiGetHomeContent,
   apiAddNews,
+  apiUpdateHomeContent,
   apiUpdateNews,
   apiUpdateUser,
 } from './api';
 import { useClerkAuth, RoleSelectForm } from './ClerkAuth';
-import type { Booking, NewsItem, TimeSlot, User } from './mockData';
+import type { Booking, HomeContent, NewsItem, TimeSlot, User } from './mockData';
+
+// Этот блок создаётся, чтобы иметь дефолтные тексты главной страницы
+// до загрузки данных с бэкенда или при временной ошибке API.
+const DEFAULT_HOME_CONTENT: HomeContent = {
+  heroBadge: '🌿 Лечебная физкультура для детей',
+  heroTitle: 'Здоровье и радость движения для вашего ребёнка',
+  heroSubtitle:
+    'Индивидуальные занятия ЛФК с опытным специалистом. Коррекция осанки, укрепление мышечного корсета и профилактика травм.',
+  heroCtaNote: 'Онлайн-запись на приём с выбором даты и времени.',
+  primaryCtaText: 'Записаться на приём',
+  secondaryCtaText: 'Войти',
+  feature1Icon: '🏃',
+  feature1Title: 'Индивидуальный подход',
+  feature1Text: 'Программа упражнений под каждого ребёнка',
+  feature2Icon: '📅',
+  feature2Title: 'Удобная запись',
+  feature2Text: 'Выбирайте время прямо на сайте',
+  benefit1Icon: '💪',
+  benefit1Title: 'Укрепление здоровья',
+  benefit1Text:
+    'Коррекция осанки и укрепление мышечного корсета под руководством специалиста',
+  benefit2Icon: '🎯',
+  benefit2Title: 'Индивидуальный план',
+  benefit2Text:
+    'Подбор упражнений с учётом возраста, здоровья и рекомендаций врача',
+  benefit3Icon: '😊',
+  benefit3Title: 'Позитивная атмосфера',
+  benefit3Text:
+    'Занятия в игровой форме, чтобы ребёнку было интересно и весело',
+  newsIcon: '📰',
+  newsTitle: 'Новости и статьи',
+  newsSubtitle: 'ЛФК и здоровье детей',
+  specialistIcon: '⚕️',
+  specialistTitle: 'О специалисте',
+  specialistText:
+    'Специалист по лечебной физкультуре с опытом работы более 10 лет. Индивидуальный подбор упражнений с учётом возраста, состояния здоровья и рекомендаций врача. Работа с детьми от 3 лет.',
+};
 
 // Компонент шапки сайта — навигация по ролям, мягкие зелёные тона, дружелюбный стиль
 const Header: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
@@ -175,10 +214,11 @@ const NewsCard: React.FC<{ item: NewsItem }> = ({ item }) => {
 // Главная страница — hero-блок с иллюстрацией, блок новостей, информация о специалисте
 const HomePage: React.FC<{
   currentUser: User | null;
+  homeContent: HomeContent;
   news: NewsItem[];
   newsLoading?: boolean;
   newsError?: string | null;
-}> = ({ currentUser, news, newsLoading, newsError }) => {
+}> = ({ currentUser, homeContent, news, newsLoading, newsError }) => {
   const navigate = useNavigate();
 
   const handlePrimaryCta = () => {
@@ -199,28 +239,26 @@ const HomePage: React.FC<{
 
         <div className="relative max-w-xl">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-bold text-mint-700 shadow-sm backdrop-blur-sm">
-            🌿 Лечебная физкультура для детей
+            {homeContent.heroBadge}
           </div>
           <h1 className="mb-3 text-3xl font-extrabold leading-tight text-gray-800 md:text-4xl">
-            Здоровье и радость<br />
-            <span className="text-mint-600">движения для вашего ребёнка</span>
+            {homeContent.heroTitle}
           </h1>
           <p className="mb-2 text-sm leading-relaxed text-gray-600">
-            Индивидуальные занятия ЛФК с опытным специалистом. Коррекция осанки,
-            укрепление мышечного корсета и профилактика травм — в удобное для вас время.
+            {homeContent.heroSubtitle}
           </p>
           <p className="mb-5 text-xs text-gray-400">
-            Онлайн-запись на приём с выбором даты и времени.
+            {homeContent.heroCtaNote}
           </p>
 
           {/* CTA-кнопки для неавторизованных гостей */}
           {!currentUser && (
             <div className="flex gap-3">
               <button type="button" onClick={handlePrimaryCta} className="btn-primary text-base">
-                Записаться на приём
+                {homeContent.primaryCtaText}
               </button>
               <a href="/login" className="btn-secondary">
-                Войти
+                {homeContent.secondaryCtaText}
               </a>
             </div>
           )}
@@ -231,18 +269,18 @@ const HomePage: React.FC<{
           <div className="inline-flex flex-col items-end gap-3">
             <div className="rounded-2xl bg-white/80 p-4 shadow-soft backdrop-blur-sm">
               <p className="text-xs font-bold uppercase tracking-wide text-coral-500">
-                🏃 Индивидуальный подход
+                {homeContent.feature1Icon} {homeContent.feature1Title}
               </p>
               <p className="mt-1 text-sm text-gray-600">
-                Программа упражнений под<br />каждого ребёнка
+                {homeContent.feature1Text}
               </p>
             </div>
             <div className="rounded-2xl bg-white/80 p-4 shadow-soft backdrop-blur-sm">
               <p className="text-xs font-bold uppercase tracking-wide text-mint-600">
-                📅 Удобная запись
+                {homeContent.feature2Icon} {homeContent.feature2Title}
               </p>
               <p className="mt-1 text-sm text-gray-600">
-                Выбирайте время прямо<br />на сайте
+                {homeContent.feature2Text}
               </p>
             </div>
           </div>
@@ -252,24 +290,24 @@ const HomePage: React.FC<{
       {/* Блок преимуществ */}
       <section className="mb-10 grid gap-4 md:grid-cols-3">
         <div className="card flex items-start gap-3">
-          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-mint-100 text-xl">💪</span>
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-mint-100 text-xl">{homeContent.benefit1Icon}</span>
           <div>
-            <h3 className="text-sm font-bold text-gray-800">Укрепление здоровья</h3>
-            <p className="mt-1 text-xs text-gray-500">Коррекция осанки и укрепление мышечного корсета под руководством специалиста</p>
+            <h3 className="text-sm font-bold text-gray-800">{homeContent.benefit1Title}</h3>
+            <p className="mt-1 text-xs text-gray-500">{homeContent.benefit1Text}</p>
           </div>
         </div>
         <div className="card flex items-start gap-3">
-          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-coral-100 text-xl">🎯</span>
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-coral-100 text-xl">{homeContent.benefit2Icon}</span>
           <div>
-            <h3 className="text-sm font-bold text-gray-800">Индивидуальный план</h3>
-            <p className="mt-1 text-xs text-gray-500">Подбор упражнений с учётом возраста, здоровья и рекомендаций врача</p>
+            <h3 className="text-sm font-bold text-gray-800">{homeContent.benefit2Title}</h3>
+            <p className="mt-1 text-xs text-gray-500">{homeContent.benefit2Text}</p>
           </div>
         </div>
         <div className="card flex items-start gap-3">
-          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-warm-100 text-xl">😊</span>
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-warm-100 text-xl">{homeContent.benefit3Icon}</span>
           <div>
-            <h3 className="text-sm font-bold text-gray-800">Позитивная атмосфера</h3>
-            <p className="mt-1 text-xs text-gray-500">Занятия в игровой форме, чтобы ребёнку было интересно и весело</p>
+            <h3 className="text-sm font-bold text-gray-800">{homeContent.benefit3Title}</h3>
+            <p className="mt-1 text-xs text-gray-500">{homeContent.benefit3Text}</p>
           </div>
         </div>
       </section>
@@ -278,11 +316,11 @@ const HomePage: React.FC<{
       <section className="mb-10">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-xl font-extrabold text-gray-800">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint-100 text-base">📰</span>
-            Новости и статьи
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint-100 text-base">{homeContent.newsIcon}</span>
+            {homeContent.newsTitle}
           </h2>
           <span className="rounded-full bg-mint-50 px-3 py-1 text-xs font-semibold text-mint-600">
-            ЛФК и здоровье детей
+            {homeContent.newsSubtitle}
           </span>
         </div>
         {newsLoading && (
@@ -307,15 +345,13 @@ const HomePage: React.FC<{
       {/* Блок «О специалисте» */}
       <section className="card border-mint-100 bg-gradient-to-r from-mint-50 to-white">
         <div className="flex items-start gap-4">
-          <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-mint-100 text-2xl">
-            ⚕️
+            <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-mint-100 text-2xl">
+            {homeContent.specialistIcon}
           </span>
           <div>
-            <h3 className="mb-2 text-base font-bold text-gray-800">О специалисте</h3>
+            <h3 className="mb-2 text-base font-bold text-gray-800">{homeContent.specialistTitle}</h3>
             <p className="text-sm leading-relaxed text-gray-600">
-              Специалист по лечебной физкультуре с опытом работы более 10 лет. Индивидуальный
-              подбор упражнений с учётом возраста, состояния здоровья и рекомендаций врача.
-              Работа с детьми от 3 лет.
+              {homeContent.specialistText}
             </p>
           </div>
         </div>
@@ -1325,17 +1361,27 @@ const SpecialistSchedulePage: React.FC<{
 const SpecialistNewsPage: React.FC<{
   currentUser: User | null;
   news: NewsItem[];
+  homeContent: HomeContent;
   newsLoading?: boolean;
   newsError?: string | null;
   onAddNews: (payload: { title: string; excerpt: string; imageUrl: string }) => Promise<void>;
   onUpdateNews: (payload: { id: string; title: string; excerpt: string; imageUrl: string }) => Promise<void>;
-}> = ({ currentUser, news, newsLoading, newsError, onAddNews, onUpdateNews }) => {
+  onUpdateHomeContent: (payload: HomeContent) => Promise<void>;
+}> = ({ currentUser, news, homeContent, newsLoading, newsError, onAddNews, onUpdateNews, onUpdateHomeContent }) => {
   const [title, setTitle] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Этот блок создаётся, чтобы редактировать все текстовые блоки главной страницы.
+  const [homeForm, setHomeForm] = useState<HomeContent>(homeContent);
+  const [homeLoading, setHomeLoading] = useState(false);
+  const [homeError, setHomeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setHomeForm(homeContent);
+  }, [homeContent]);
 
   if (!currentUser || currentUser.role !== 'specialist') {
     return (
@@ -1372,6 +1418,19 @@ const SpecialistNewsPage: React.FC<{
       setError(err instanceof Error ? err.message : 'Ошибка при сохранении');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleHomeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setHomeError(null);
+    setHomeLoading(true);
+    try {
+      await onUpdateHomeContent(homeForm);
+    } catch (err) {
+      setHomeError(err instanceof Error ? err.message : 'Ошибка при сохранении главной страницы');
+    } finally {
+      setHomeLoading(false);
     }
   };
 
@@ -1432,6 +1491,147 @@ const SpecialistNewsPage: React.FC<{
         </form>
       </section>
 
+      {/* Форма редактирования контента главной страницы */}
+      <section className="card mb-5">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-warm-100 text-xl">🏠</span>
+          <h2 className="text-base font-bold text-gray-800">Контент главной страницы</h2>
+        </div>
+        {homeError && (
+          <div className="mb-3 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600">
+            {homeError}
+          </div>
+        )}
+        <form onSubmit={handleHomeSubmit} className="space-y-3">
+          {/* Этот блок создаётся, чтобы специалист мог редактировать Hero-секцию главной страницы. */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Кнопка 1 (основная)</label>
+              <input className="input-field" value={homeForm.primaryCtaText} onChange={(e) => setHomeForm((p) => ({ ...p, primaryCtaText: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Кнопка 2 (вторичная)</label>
+              <input className="input-field" value={homeForm.secondaryCtaText} onChange={(e) => setHomeForm((p) => ({ ...p, secondaryCtaText: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Hero: бейдж</label>
+              <input className="input-field" value={homeForm.heroBadge} onChange={(e) => setHomeForm((p) => ({ ...p, heroBadge: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Hero: заголовок</label>
+              <input className="input-field" value={homeForm.heroTitle} onChange={(e) => setHomeForm((p) => ({ ...p, heroTitle: e.target.value }))} />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Hero: описание</label>
+              <textarea className="input-field resize-none" rows={2} value={homeForm.heroSubtitle} onChange={(e) => setHomeForm((p) => ({ ...p, heroSubtitle: e.target.value }))} />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Hero: подпись под кнопкой</label>
+              <input className="input-field" value={homeForm.heroCtaNote} onChange={(e) => setHomeForm((p) => ({ ...p, heroCtaNote: e.target.value }))} />
+            </div>
+          </div>
+
+          {/* Этот блок создаётся, чтобы редактировать правые карточки Hero-блока. */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фича 1: иконка/эмодзи</label>
+              <input className="input-field" value={homeForm.feature1Icon} onChange={(e) => setHomeForm((p) => ({ ...p, feature1Icon: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фича 1: заголовок</label>
+              <input className="input-field" value={homeForm.feature1Title} onChange={(e) => setHomeForm((p) => ({ ...p, feature1Title: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фича 2: иконка/эмодзи</label>
+              <input className="input-field" value={homeForm.feature2Icon} onChange={(e) => setHomeForm((p) => ({ ...p, feature2Icon: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фича 1: текст</label>
+              <input className="input-field" value={homeForm.feature1Text} onChange={(e) => setHomeForm((p) => ({ ...p, feature1Text: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фича 2: заголовок</label>
+              <input className="input-field" value={homeForm.feature2Title} onChange={(e) => setHomeForm((p) => ({ ...p, feature2Title: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фича 2: текст</label>
+              <input className="input-field" value={homeForm.feature2Text} onChange={(e) => setHomeForm((p) => ({ ...p, feature2Text: e.target.value }))} />
+            </div>
+          </div>
+
+          {/* Этот блок создаётся, чтобы редактировать карточки преимуществ. */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Преимущество 1: иконка/эмодзи</label>
+              <input className="input-field" value={homeForm.benefit1Icon} onChange={(e) => setHomeForm((p) => ({ ...p, benefit1Icon: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Преимущество 1: заголовок</label>
+              <input className="input-field" value={homeForm.benefit1Title} onChange={(e) => setHomeForm((p) => ({ ...p, benefit1Title: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Преимущество 2: иконка/эмодзи</label>
+              <input className="input-field" value={homeForm.benefit2Icon} onChange={(e) => setHomeForm((p) => ({ ...p, benefit2Icon: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Преимущество 1: текст</label>
+              <input className="input-field" value={homeForm.benefit1Text} onChange={(e) => setHomeForm((p) => ({ ...p, benefit1Text: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Преимущество 3: иконка/эмодзи</label>
+              <input className="input-field" value={homeForm.benefit3Icon} onChange={(e) => setHomeForm((p) => ({ ...p, benefit3Icon: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Преимущество 2: заголовок</label>
+              <input className="input-field" value={homeForm.benefit2Title} onChange={(e) => setHomeForm((p) => ({ ...p, benefit2Title: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Преимущество 2: текст</label>
+              <input className="input-field" value={homeForm.benefit2Text} onChange={(e) => setHomeForm((p) => ({ ...p, benefit2Text: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Преимущество 3: заголовок</label>
+              <input className="input-field" value={homeForm.benefit3Title} onChange={(e) => setHomeForm((p) => ({ ...p, benefit3Title: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Преимущество 3: текст</label>
+              <input className="input-field" value={homeForm.benefit3Text} onChange={(e) => setHomeForm((p) => ({ ...p, benefit3Text: e.target.value }))} />
+            </div>
+          </div>
+
+          {/* Этот блок создаётся, чтобы редактировать заголовки новостей и раздел «О специалисте». */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Новости: иконка/эмодзи</label>
+              <input className="input-field" value={homeForm.newsIcon} onChange={(e) => setHomeForm((p) => ({ ...p, newsIcon: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Новости: заголовок</label>
+              <input className="input-field" value={homeForm.newsTitle} onChange={(e) => setHomeForm((p) => ({ ...p, newsTitle: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">О специалисте: иконка/эмодзи</label>
+              <input className="input-field" value={homeForm.specialistIcon} onChange={(e) => setHomeForm((p) => ({ ...p, specialistIcon: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Новости: подзаголовок</label>
+              <input className="input-field" value={homeForm.newsSubtitle} onChange={(e) => setHomeForm((p) => ({ ...p, newsSubtitle: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">О специалисте: заголовок</label>
+              <input className="input-field" value={homeForm.specialistTitle} onChange={(e) => setHomeForm((p) => ({ ...p, specialistTitle: e.target.value }))} />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">О специалисте: текст</label>
+              <textarea className="input-field resize-none" rows={3} value={homeForm.specialistText} onChange={(e) => setHomeForm((p) => ({ ...p, specialistText: e.target.value }))} />
+            </div>
+          </div>
+          <button type="submit" disabled={homeLoading} className="btn-primary w-full">
+            {homeLoading ? 'Сохранение...' : 'Сохранить изменения главной страницы'}
+          </button>
+        </form>
+      </section>
+
       {/* Список текущих новостей */}
       <section className="card">
         <div className="mb-4 flex items-center gap-3">
@@ -1471,6 +1671,7 @@ const SpecialistNewsPage: React.FC<{
 const App: React.FC = () => {
   const { user: currentUser, loading: authLoading, needsRoleSelect, roleSelectEmail, completeRoleSelect, getToken, refreshUser } = useClerkAuth();
   const [news, setNews] = useState<NewsItem[]>([]);
+  const [homeContent, setHomeContent] = useState<HomeContent>(DEFAULT_HOME_CONTENT);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loadingNews, setLoadingNews] = useState(true);
@@ -1490,6 +1691,16 @@ const App: React.FC = () => {
       setErrorNews(err instanceof Error ? err.message : 'Не удалось загрузить новости');
     } finally {
       setLoadingNews(false);
+    }
+  }, []);
+
+  const fetchHomeContent = useCallback(async () => {
+    // Этот блок создаётся, чтобы загрузить редактируемый контент главной страницы из API.
+    try {
+      const data = await apiGetHomeContent();
+      setHomeContent(data);
+    } catch {
+      setHomeContent(DEFAULT_HOME_CONTENT);
     }
   }, []);
 
@@ -1527,7 +1738,10 @@ const App: React.FC = () => {
     }
   }, [currentUser, getToken]);
 
-  useEffect(() => { fetchNews(); }, [fetchNews]);
+  useEffect(() => {
+    fetchNews();
+    fetchHomeContent();
+  }, [fetchNews, fetchHomeContent]);
 
   useEffect(() => {
     if (currentUser) {
@@ -1617,6 +1831,15 @@ const App: React.FC = () => {
     setNews((prev) => prev.map((n) => (n.id === payload.id ? updated : n)));
   }, [currentUser, getToken]);
 
+  const handleUpdateHomeContent = useCallback(async (payload: HomeContent) => {
+    // Этот блок создаётся, чтобы сохранить новый контент главной страницы и сразу обновить UI.
+    if (!currentUser) return;
+    const token = await getToken();
+    if (!token) return;
+    const updated = await apiUpdateHomeContent(token, payload);
+    setHomeContent(updated);
+  }, [currentUser, getToken]);
+
   const handleCreateSlotBySpecialist = useCallback(async (payload: { date: string; time: string }) => {
     if (!currentUser) return;
     const token = await getToken();
@@ -1702,6 +1925,7 @@ const App: React.FC = () => {
           element={
             <HomePage
               currentUser={currentUser}
+              homeContent={homeContent}
               news={news}
               newsLoading={loadingNews}
               newsError={errorNews}
@@ -1819,10 +2043,12 @@ const App: React.FC = () => {
             <SpecialistNewsPage
               currentUser={currentUser}
               news={news}
+              homeContent={homeContent}
               newsLoading={loadingNews}
               newsError={errorNews}
               onAddNews={handleAddNews}
               onUpdateNews={handleUpdateNews}
+              onUpdateHomeContent={handleUpdateHomeContent}
             />
           }
         />

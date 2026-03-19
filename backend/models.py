@@ -69,6 +69,69 @@ class NewsItemResponse(BaseModel):
     source: Optional[str] = None
 
 
+# --- Site content (главная страница) ---
+class HomeContentResponse(BaseModel):
+    """Ответ с редактируемым контентом главной страницы"""
+    heroBadge: str
+    heroTitle: str
+    heroSubtitle: str
+    heroCtaNote: str
+    primaryCtaText: str
+    secondaryCtaText: str
+    feature1Icon: str
+    feature1Title: str
+    feature1Text: str
+    feature2Icon: str
+    feature2Title: str
+    feature2Text: str
+    benefit1Icon: str
+    benefit1Title: str
+    benefit1Text: str
+    benefit2Icon: str
+    benefit2Title: str
+    benefit2Text: str
+    benefit3Icon: str
+    benefit3Title: str
+    benefit3Text: str
+    newsIcon: str
+    newsTitle: str
+    newsSubtitle: str
+    specialistIcon: str
+    specialistTitle: str
+    specialistText: str
+
+
+class HomeContentUpdateRequest(BaseModel):
+    """Запрос на обновление контента главной страницы (все поля обязательны)"""
+    heroBadge: str
+    heroTitle: str
+    heroSubtitle: str
+    heroCtaNote: str
+    primaryCtaText: str
+    secondaryCtaText: str
+    feature1Icon: str
+    feature1Title: str
+    feature1Text: str
+    feature2Icon: str
+    feature2Title: str
+    feature2Text: str
+    benefit1Icon: str
+    benefit1Title: str
+    benefit1Text: str
+    benefit2Icon: str
+    benefit2Title: str
+    benefit2Text: str
+    benefit3Icon: str
+    benefit3Title: str
+    benefit3Text: str
+    newsIcon: str
+    newsTitle: str
+    newsSubtitle: str
+    specialistIcon: str
+    specialistTitle: str
+    specialistText: str
+
+
 # --- Slots ---
 class SlotCreateRequest(BaseModel):
     """Запрос на добавление одного слота"""

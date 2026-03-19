@@ -13,7 +13,7 @@ load_dotenv()
 # иначе будет использован дефолтный SQLite и возможны несовпадения схемы (например, нет users.username).
 from db import init_db  # noqa: E402
 # auth роутер отключён: регистрация и вход через Clerk (фронтенд).
-from routers import users, news, slots, bookings  # noqa: F401,E402
+from routers import users, news, slots, bookings, site_content  # noqa: F401,E402
 
 app = FastAPI(
     title="API Сайт ЛФК",
@@ -39,6 +39,7 @@ app.include_router(users.router, prefix="/api")
 app.include_router(news.router, prefix="/api")
 app.include_router(slots.router, prefix="/api")
 app.include_router(bookings.router, prefix="/api")
+app.include_router(site_content.router, prefix="/api")
 
 
 @app.on_event("startup")

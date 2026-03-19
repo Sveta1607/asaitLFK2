@@ -149,3 +149,23 @@ class Booking(Base):
     specialist = relationship("User", foreign_keys=[specialist_id], back_populates="bookings_as_specialist")
     patient = relationship("User", foreign_keys=[user_id], back_populates="bookings_as_patient")
 
+
+class SiteContent(Base):
+    """
+    Эта модель создаётся, чтобы:
+    - хранить редактируемый контент главной страницы в БД;
+    - позволить специалисту менять тексты без правок кода;
+    - отдавать единый контент всем посетителям сайта.
+    """
+
+    __tablename__ = "site_content"
+
+    # Это поле создаётся, чтобы хранить тип контента (например, "home").
+    id = Column(String, primary_key=True, index=True)
+    # Это поле создаётся, чтобы хранить JSON со всеми текстами главной страницы.
+    content_json = Column(Text, nullable=False)
+    # Это поле создаётся, чтобы хранить дату создания записи контента.
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    # Это поле создаётся, чтобы хранить дату последнего обновления контента.
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+

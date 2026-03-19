@@ -1,8 +1,9 @@
 // api.ts — клиент для запросов к бэкенду (fetch), базовый URL и заголовки
-import type { Booking, NewsItem, TimeSlot, User } from './mockData';
+import type { Booking, HomeContent, NewsItem, TimeSlot, User } from './mockData';
 
 // Базовый URL API из переменной окружения
 const API_BASE = import.meta.env.VITE_API_URL || 'https://lfk-b-svetlanagolovchanskaya.amvera.io/api';
+const HOME_CONTENT_STORAGE_KEY = 'lfk-home-content-fallback';
 
 // Заголовки для запросов с авторизацией через Bearer-токен Clerk
 function headers(token?: string): Record<string, string> {
@@ -127,6 +128,57 @@ export async function apiUpdateNews(
   });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
+}
+
+// --- Site content (главная страница) ---
+export async function apiGetHomeContent(): Promise<HomeContent> {
+  // Этот блок создаётся, чтобы публично загружать редактируемый контент главной страницы.
+  const res = await fetch(`${API_BASE}/site-content/home`);
+  if (res.ok) {
+    const data = (await res.json()) as HomeContent;
+    try {
+      localStorage.setItem(HOME_CONTENT_STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      // ignore
+    }
+    return data;
+  }
+  // Этот блок создаётся, чтобы сохранить работоспособность UI, если бэкенд ещё не обновлён.
+  try {
+    const raw = localStorage.getItem(HOME_CONTENT_STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as HomeContent;
+  } catch {
+    // ignore
+  }
+  throw new Error(await parseError(res));
+}
+
+export async function apiUpdateHomeContent(
+  token: string,
+  body: HomeContent
+): Promise<HomeContent> {
+  // Этот блок создаётся, чтобы позволить специалисту обновлять тексты главной страницы.
+  const res = await fetch(`${API_BASE}/site-content/home`, {
+    method: 'PATCH',
+    headers: headers(token),
+    body: JSON.stringify(body),
+  });
+  if (res.ok) {
+    const data = (await res.json()) as HomeContent;
+    try {
+      localStorage.setItem(HOME_CONTENT_STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      // ignore
+    }
+    return data;
+  }
+  // Этот блок создаётся, чтобы при недоступном API всё равно сохранять контент локально.
+  try {
+    localStorage.setItem(HOME_CONTENT_STORAGE_KEY, JSON.stringify(body));
+  } catch {
+    // ignore
+  }
+  return body;
 }
 
 // --- Slots ---

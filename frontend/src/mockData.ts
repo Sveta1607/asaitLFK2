@@ -51,6 +51,37 @@ export type NewsItem = {
   source?: 'manual' | 'rss';
 };
 
+// Тип контента главной страницы (редактируется специалистом)
+export type HomeContent = {
+  heroBadge: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  heroCtaNote: string;
+  primaryCtaText: string;
+  secondaryCtaText: string;
+  feature1Icon: string;
+  feature1Title: string;
+  feature1Text: string;
+  feature2Icon: string;
+  feature2Title: string;
+  feature2Text: string;
+  benefit1Icon: string;
+  benefit1Title: string;
+  benefit1Text: string;
+  benefit2Icon: string;
+  benefit2Title: string;
+  benefit2Text: string;
+  benefit3Icon: string;
+  benefit3Title: string;
+  benefit3Text: string;
+  newsIcon: string;
+  newsTitle: string;
+  newsSubtitle: string;
+  specialistIcon: string;
+  specialistTitle: string;
+  specialistText: string;
+};
+
 // Ключ localStorage для текущего пользователя (сессия между перезагрузками)
 const STORAGE_KEY_USER = 'lfk-current-user';
 
