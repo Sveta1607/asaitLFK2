@@ -1,0 +1,17 @@
+# .gitignore — файл, который подсказывает Git какие файлы и папки не отслеживать
+
+# node_modules — установленные зависимости, их всегда можно восстановить по package.json
+node_modules/
+
+# Сборка Vite/React
+dist/
+
+# Логи npm/yarn
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Файлы операционной системы
+.DS_Store
+Thumbs.db
+

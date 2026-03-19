@@ -1,0 +1,11 @@
+/* index.css — общий файл стилей, в котором подключаются слои Tailwind */
+
+/* @tailwind base — базовые стили (reset, типографика и т.п.) */
+@tailwind base;
+
+/* @tailwind components — переиспользуемые компонентные классы (если будут) */
+@tailwind components;
+
+/* @tailwind utilities — утилитарные классы (margin, padding, flex и т.п.) */
+@tailwind utilities;
+
