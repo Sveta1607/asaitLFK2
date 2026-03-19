@@ -1,11 +1,53 @@
-/* index.css — общий файл стилей, в котором подключаются слои Tailwind */
+/* index.css — общий файл стилей для детского ЛФК-сайта */
 
 /* @tailwind base — базовые стили (reset, типографика и т.п.) */
 @tailwind base;
 
-/* @tailwind components — переиспользуемые компонентные классы (если будут) */
+/* @tailwind components — переиспользуемые компонентные классы */
 @tailwind components;
 
-/* @tailwind utilities — утилитарные классы (margin, padding, flex и т.п.) */
+/* @tailwind utilities — утилитарные классы */
 @tailwind utilities;
 
+/* Глобальные стили для мягкого, дружелюбного внешнего вида */
+@layer base {
+  body {
+    @apply font-sans text-gray-700 antialiased;
+    min-height: 100vh;
+  }
+}
+
+/* Компонентные классы для повторяющихся паттернов */
+@layer components {
+  /* Основная кнопка — зелёная, мягкая, с плавным hover */
+  .btn-primary {
+    @apply rounded-xl bg-mint-500 px-5 py-2.5 text-sm font-bold text-white
+           shadow-sm transition-all duration-200
+           hover:bg-mint-600 hover:shadow-md
+           active:scale-[0.98]
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Вторичная кнопка — обводка, мягкий фон при hover */
+  .btn-secondary {
+    @apply rounded-xl border-2 border-mint-200 bg-white px-5 py-2.5 text-sm
+           font-semibold text-mint-700
+           transition-all duration-200
+           hover:border-mint-300 hover:bg-mint-50
+           active:scale-[0.98];
+  }
+
+  /* Карточка — единообразный стиль для блоков контента */
+  .card {
+    @apply rounded-2xl border border-gray-100 bg-white p-5 shadow-soft
+           transition-shadow duration-200 hover:shadow-card;
+  }
+
+  /* Поле ввода — мягкий стиль с зелёным акцентом при фокусе */
+  .input-field {
+    @apply w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5
+           text-sm outline-none transition-colors
+           placeholder:text-gray-400
+           focus:border-mint-400 focus:ring-2 focus:ring-mint-100;
+  }
+}

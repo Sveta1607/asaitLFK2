@@ -19,54 +19,54 @@ import {
 import { useClerkAuth, RoleSelectForm } from './ClerkAuth';
 import type { Booking, NewsItem, TimeSlot, User } from './mockData';
 
-// Компонент шапки сайта с навигацией по ролям и кнопкой выхода (Clerk SignOutButton)
+// Компонент шапки сайта — навигация по ролям, мягкие зелёные тона, дружелюбный стиль
 const Header: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
-  // location нужен, чтобы подсвечивать активные ссылки при необходимости
   const location = useLocation();
-
-  // Функция для проверки, активен ли сейчас маршрут
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    // Внешний контейнер шапки: фиксированный блок навигации
-    <header className="border-b bg-white">
-      {/* Внутренний контейнер: выравнивание контента по центру и распределение по сторонам */}
+    <header className="sticky top-0 z-50 border-b border-mint-100 bg-white/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        {/* Левая часть: логотип/название сайта */}
-        <Link to="/" className="text-lg font-semibold text-sky-700">
-          {/* Текстовое название приложения */}
-          Сайт ЛФК
+        {/* Логотип с детским акцентом */}
+        <Link to="/" className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-mint-700">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-mint-100 text-lg">
+            🧒
+          </span>
+          Детский ЛФК
         </Link>
 
-        {/* Правая часть: навигация и кнопки входа/выхода */}
-        <nav className="flex items-center gap-4 text-sm">
-          {/* Ссылка на главную страницу */}
+        {/* Навигационные ссылки */}
+        <nav className="flex items-center gap-1 text-sm font-semibold">
           <Link
             to="/"
-            className={isActive('/') ? 'text-sky-700 font-semibold' : 'text-slate-700 hover:text-sky-700'}
+            className={
+              isActive('/')
+                ? 'rounded-lg bg-mint-50 px-3 py-1.5 text-mint-700'
+                : 'rounded-lg px-3 py-1.5 text-gray-600 transition-colors hover:bg-mint-50 hover:text-mint-700'
+            }
           >
             Главная
           </Link>
 
-          {/* Если авторизован пациент — показываем ссылки на запись и свои записи */}
+          {/* Ссылки пациента */}
           {currentUser?.role === 'user' && (
             <>
-              {/* Ссылка для пациента на страницу записи */}
               <Link
                 to="/book"
                 className={
-                  isActive('/book') ? 'text-sky-700 font-semibold' : 'text-slate-700 hover:text-sky-700'
+                  isActive('/book')
+                    ? 'rounded-lg bg-mint-50 px-3 py-1.5 text-mint-700'
+                    : 'rounded-lg px-3 py-1.5 text-gray-600 transition-colors hover:bg-mint-50 hover:text-mint-700'
                 }
               >
                 Записаться
               </Link>
-              {/* Ссылка для пациента на список своих записей */}
               <Link
                 to="/my-bookings"
                 className={
                   isActive('/my-bookings')
-                    ? 'text-sky-700 font-semibold'
-                    : 'text-slate-700 hover:text-sky-700'
+                    ? 'rounded-lg bg-mint-50 px-3 py-1.5 text-mint-700'
+                    : 'rounded-lg px-3 py-1.5 text-gray-600 transition-colors hover:bg-mint-50 hover:text-mint-700'
                 }
               >
                 Мои записи
@@ -74,27 +74,25 @@ const Header: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
             </>
           )}
 
-          {/* Если авторизован специалист — показываем ссылки на расписание и управление новостями */}
+          {/* Ссылки специалиста */}
           {currentUser?.role === 'specialist' && (
             <>
-              {/* Ссылка для специалиста на своё расписание */}
               <Link
                 to="/specialist/schedule"
                 className={
                   isActive('/specialist/schedule')
-                    ? 'text-sky-700 font-semibold'
-                    : 'text-slate-700 hover:text-sky-700'
+                    ? 'rounded-lg bg-mint-50 px-3 py-1.5 text-mint-700'
+                    : 'rounded-lg px-3 py-1.5 text-gray-600 transition-colors hover:bg-mint-50 hover:text-mint-700'
                 }
               >
                 Расписание
               </Link>
-              {/* Ссылка для специалиста на управление новостями */}
               <Link
                 to="/specialist/news"
                 className={
                   isActive('/specialist/news')
-                    ? 'text-sky-700 font-semibold'
-                    : 'text-slate-700 hover:text-sky-700'
+                    ? 'rounded-lg bg-mint-50 px-3 py-1.5 text-mint-700'
+                    : 'rounded-lg px-3 py-1.5 text-gray-600 transition-colors hover:bg-mint-50 hover:text-mint-700'
                 }
               >
                 Новости
@@ -102,46 +100,42 @@ const Header: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
             </>
           )}
 
-          {/* Ссылка на профиль для любого авторизованного пользователя */}
+          {/* Ссылка на профиль */}
           {currentUser && (
             <Link
               to="/profile"
               className={
                 isActive('/profile')
-                  ? 'text-sky-700 font-semibold'
-                  : 'text-slate-700 hover:text-sky-700'
+                  ? 'rounded-lg bg-mint-50 px-3 py-1.5 text-mint-700'
+                  : 'rounded-lg px-3 py-1.5 text-gray-600 transition-colors hover:bg-mint-50 hover:text-mint-700'
               }
             >
               Профиль
             </Link>
           )}
 
-          {/* Если пользователь не авторизован — показываем ссылку входа, которая ведёт на /login.
-              Здесь используем обычный <a>, чтобы навигация сработала даже при проблемах с Router. */}
+          {/* Кнопка входа для гостей */}
           {!currentUser && (
-            <a
-              href="/login"
-              className="rounded-md bg-sky-600 px-3 py-1.5 text-white hover:bg-sky-700"
-            >
+            <a href="/login" className="btn-primary ml-2">
               Войти
             </a>
           )}
 
-          {/* Если пользователь авторизован — показываем его роль и кнопку выхода через Clerk */}
+          {/* Индикатор роли и кнопка выхода */}
           {currentUser && (
-            <>
-              <span className="text-xs text-slate-500">
-                {currentUser.role === 'user' ? 'Пациент' : currentUser.role === 'specialist' ? 'Специалист' : 'Админ'}
+            <div className="ml-2 flex items-center gap-2">
+              <span className="rounded-full bg-warm-100 px-2.5 py-0.5 text-xs font-bold text-warm-500">
+                {currentUser.role === 'user' ? '👤 Пациент' : currentUser.role === 'specialist' ? '⚕️ Специалист' : '🔧 Админ'}
               </span>
               <SignOutButton>
                 <button
                   type="button"
-                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100"
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
                 >
                   Выйти
                 </button>
               </SignOutButton>
-            </>
+            </div>
           )}
         </nav>
       </div>
@@ -149,27 +143,28 @@ const Header: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
   );
 };
 
-// Компонент карточки новости на главной странице
+// Компонент карточки новости — мягкие тени, скруглённые углы, зелёный акцент
 const NewsCard: React.FC<{ item: NewsItem }> = ({ item }) => {
   return (
-    // Внешний контейнер новости: карточка с тенью
-    <article className="flex flex-col overflow-hidden rounded-lg border bg-white shadow-sm">
-      {/* Картинка новости */}
-      <div className="h-40 w-full overflow-hidden">
+    <article className="card group flex flex-col overflow-hidden !p-0">
+      {/* Изображение новости с плавным зумом при наведении */}
+      <div className="h-44 w-full overflow-hidden">
         <img
           src={item.imageUrl}
           alt={item.title}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
       </div>
-      {/* Текстовое содержимое новости */}
-      <div className="flex flex-1 flex-col gap-2 p-3">
-        <h3 className="text-sm font-semibold text-slate-900">{item.title}</h3>
-        <p className="text-xs text-slate-600">{item.excerpt}</p>
-        <div className="mt-auto flex items-center justify-between pt-2 text-[11px] text-slate-400">
+      {/* Текстовая часть */}
+      <div className="flex flex-1 flex-col gap-2 p-4">
+        <h3 className="text-sm font-bold text-gray-800">{item.title}</h3>
+        <p className="text-xs leading-relaxed text-gray-500">{item.excerpt}</p>
+        <div className="mt-auto flex items-center justify-between border-t border-gray-50 pt-3 text-[11px] text-gray-400">
           <span>{new Date(item.date).toLocaleDateString('ru-RU')}</span>
           {item.source && (
-            <span>{item.source === 'manual' ? 'Добавлено вручную' : 'Автоисточник'}</span>
+            <span className="rounded-full bg-mint-50 px-2 py-0.5 text-mint-600">
+              {item.source === 'manual' ? 'Вручную' : 'Авто'}
+            </span>
           )}
         </div>
       </div>
@@ -177,7 +172,7 @@ const NewsCard: React.FC<{ item: NewsItem }> = ({ item }) => {
   );
 };
 
-// Главная страница с описанием услуги и блоком новостей
+// Главная страница — hero-блок с иллюстрацией, блок новостей, информация о специалисте
 const HomePage: React.FC<{
   currentUser: User | null;
   news: NewsItem[];
@@ -186,83 +181,122 @@ const HomePage: React.FC<{
 }> = ({ currentUser, news, newsLoading, newsError }) => {
   const navigate = useNavigate();
 
-  // Обработчик нажатия на кнопку «Записаться на приём»
   const handlePrimaryCta = () => {
-    // Если пользователь — пациент, ведём сразу на страницу записи
     if (currentUser?.role === 'user') {
       navigate('/book');
     } else {
-      // Иначе отправляем на страницу входа
       navigate('/login');
     }
   };
 
   return (
-    // Основной контейнер главной страницы
-    <main className="mx-auto max-w-5xl px-4 py-6">
-      {/* Hero-блок с кратким описанием и основной кнопкой */}
-      <section className="mb-8 flex flex-col gap-4 rounded-xl bg-sky-50 p-6 md:flex-row md:items-center md:justify-between">
-        <div className="max-w-xl">
-          <h1 className="mb-2 text-2xl font-bold text-sky-900">
-            ЛФК для детей и взрослых
+    <main className="mx-auto max-w-5xl px-4 py-8">
+      {/* Hero-блок — тёплый градиент, дружелюбная подача */}
+      <section className="relative mb-10 overflow-hidden rounded-3xl bg-gradient-to-br from-mint-100 via-mint-50 to-warm-50 p-8 md:flex md:items-center md:justify-between md:p-10">
+        {/* Декоративные круги на фоне */}
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-mint-200/30" />
+        <div className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-warm-200/30" />
+
+        <div className="relative max-w-xl">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-bold text-mint-700 shadow-sm backdrop-blur-sm">
+            🌿 Лечебная физкультура для детей
+          </div>
+          <h1 className="mb-3 text-3xl font-extrabold leading-tight text-gray-800 md:text-4xl">
+            Здоровье и радость<br />
+            <span className="text-mint-600">движения для вашего ребёнка</span>
           </h1>
-          <p className="text-sm text-slate-700">
-            Онлайн-запись на приём к специалисту по лечебной физкультуре. Удобный выбор
-            времени и напоминания о приёме.
+          <p className="mb-2 text-sm leading-relaxed text-gray-600">
+            Индивидуальные занятия ЛФК с опытным специалистом. Коррекция осанки,
+            укрепление мышечного корсета и профилактика травм — в удобное для вас время.
           </p>
-          <p className="mt-2 text-xs text-slate-500">
-            Сервис предназначен для лиц старше 18 лет.
+          <p className="mb-5 text-xs text-gray-400">
+            Онлайн-запись на приём с выбором даты и времени.
           </p>
-          {/* Блок основных кнопок (Записаться / Войти) показываем только гостю.
-              После авторизации они скрываются, чтобы не дублировать навигацию. */}
+
+          {/* CTA-кнопки для неавторизованных гостей */}
           {!currentUser && (
-            <div className="mt-4 flex gap-3">
-              <button
-                type="button"
-                onClick={handlePrimaryCta}
-                className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-              >
+            <div className="flex gap-3">
+              <button type="button" onClick={handlePrimaryCta} className="btn-primary text-base">
                 Записаться на приём
               </button>
-              <a
-                href="/login"
-                className="rounded-md border border-sky-200 px-4 py-2 text-sm text-sky-700 hover:bg-sky-50"
-              >
+              <a href="/login" className="btn-secondary">
                 Войти
               </a>
             </div>
           )}
         </div>
-        <div className="mt-4 flex-1 md:mt-0 md:text-right">
-          <p className="text-xs uppercase tracking-wide text-slate-500">
-            Индивидуальные занятия ЛФК
-          </p>
-          <p className="mt-1 text-sm text-slate-600">
-            Коррекция осанки, укрепление мышечного корсета и профилактика травм.
-          </p>
+
+        {/* Информационная колонка справа */}
+        <div className="relative mt-6 flex-shrink-0 md:mt-0 md:ml-8 md:text-right">
+          <div className="inline-flex flex-col items-end gap-3">
+            <div className="rounded-2xl bg-white/80 p-4 shadow-soft backdrop-blur-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-coral-500">
+                🏃 Индивидуальный подход
+              </p>
+              <p className="mt-1 text-sm text-gray-600">
+                Программа упражнений под<br />каждого ребёнка
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/80 p-4 shadow-soft backdrop-blur-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-mint-600">
+                📅 Удобная запись
+              </p>
+              <p className="mt-1 text-sm text-gray-600">
+                Выбирайте время прямо<br />на сайте
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Блок новостей с карточками */}
-      <section className="mb-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Новости и статьи</h2>
-          <span className="text-xs text-slate-500">
-            ЛФК, здоровье детей и полезные материалы
+      {/* Блок преимуществ */}
+      <section className="mb-10 grid gap-4 md:grid-cols-3">
+        <div className="card flex items-start gap-3">
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-mint-100 text-xl">💪</span>
+          <div>
+            <h3 className="text-sm font-bold text-gray-800">Укрепление здоровья</h3>
+            <p className="mt-1 text-xs text-gray-500">Коррекция осанки и укрепление мышечного корсета под руководством специалиста</p>
+          </div>
+        </div>
+        <div className="card flex items-start gap-3">
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-coral-100 text-xl">🎯</span>
+          <div>
+            <h3 className="text-sm font-bold text-gray-800">Индивидуальный план</h3>
+            <p className="mt-1 text-xs text-gray-500">Подбор упражнений с учётом возраста, здоровья и рекомендаций врача</p>
+          </div>
+        </div>
+        <div className="card flex items-start gap-3">
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-warm-100 text-xl">😊</span>
+          <div>
+            <h3 className="text-sm font-bold text-gray-800">Позитивная атмосфера</h3>
+            <p className="mt-1 text-xs text-gray-500">Занятия в игровой форме, чтобы ребёнку было интересно и весело</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Блок новостей */}
+      <section className="mb-10">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-xl font-extrabold text-gray-800">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint-100 text-base">📰</span>
+            Новости и статьи
+          </h2>
+          <span className="rounded-full bg-mint-50 px-3 py-1 text-xs font-semibold text-mint-600">
+            ЛФК и здоровье детей
           </span>
         </div>
         {newsLoading && (
-          <div className="rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-700">
+          <div className="card border-mint-100 bg-mint-50 text-xs text-mint-700">
             Загрузка новостей...
           </div>
         )}
         {newsError && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <div className="card border-red-100 bg-red-50 text-xs text-red-600">
             {newsError}
           </div>
         )}
         {!newsLoading && !newsError && (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             {news.map((item) => (
               <NewsCard key={item.id} item={item} />
             ))}
@@ -270,33 +304,39 @@ const HomePage: React.FC<{
         )}
       </section>
 
-      {/* Небольшой блок «О специалисте» */}
-      <section className="rounded-xl border bg-white p-4 text-sm text-slate-700">
-        <h3 className="mb-2 text-base font-semibold text-slate-900">О специалисте</h3>
-        <p>
-          Специалист по лечебной физкультуре с опытом работы более 10 лет. Индивидуальный
-          подбор упражнений с учётом возраста, состояния здоровья и рекомендаций врача.
-        </p>
+      {/* Блок «О специалисте» */}
+      <section className="card border-mint-100 bg-gradient-to-r from-mint-50 to-white">
+        <div className="flex items-start gap-4">
+          <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-mint-100 text-2xl">
+            ⚕️
+          </span>
+          <div>
+            <h3 className="mb-2 text-base font-bold text-gray-800">О специалисте</h3>
+            <p className="text-sm leading-relaxed text-gray-600">
+              Специалист по лечебной физкультуре с опытом работы более 10 лет. Индивидуальный
+              подбор упражнений с учётом возраста, состояния здоровья и рекомендаций врача.
+              Работа с детьми от 3 лет.
+            </p>
+          </div>
+        </div>
       </section>
     </main>
   );
 };
 
-// Страница профиля: просмотр и изменение части данных пользователя
+// Страница профиля — просмотр и редактирование данных пользователя
 const ProfilePage: React.FC<{
   currentUser: User | null;
   getToken: () => Promise<string | null>;
   onUpdateUser: () => void;
 }> = ({ currentUser, getToken, onUpdateUser }) => {
-  // Если пользователь не авторизован — показываем простое сообщение
   if (!currentUser) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-6">
-        <div className="rounded-xl border bg-white p-6 text-sm">
-          <h1 className="mb-2 text-lg font-semibold text-slate-900">
-            Профиль недоступен
-          </h1>
-          <p className="text-slate-700">
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <div className="card text-center">
+          <span className="mb-3 inline-block text-4xl">🔒</span>
+          <h1 className="mb-2 text-lg font-bold text-gray-800">Профиль недоступен</h1>
+          <p className="text-sm text-gray-500">
             Войдите в систему как пациент или специалист, чтобы просматривать профиль.
           </p>
         </div>
@@ -304,17 +344,11 @@ const ProfilePage: React.FC<{
     );
   }
 
-  // Локальное состояние для редактируемых полей профиля.
-  // Нужен, чтобы:
-  // - позволить менять e-mail, имя, фамилию и телефон;
-  // - не трогать объект currentUser до успешного сохранения.
   const [email, setEmail] = useState(currentUser.email);
   const [firstName, setFirstName] = useState(currentUser.firstName ?? '');
   const [lastName, setLastName] = useState(currentUser.lastName ?? '');
   const [phone, setPhone] = useState(currentUser.phone ?? '');
-  // Локальное состояние для текстовой ошибки (если e-mail не заполнен)
   const [error, setError] = useState<string | null>(null);
-
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -343,77 +377,74 @@ const ProfilePage: React.FC<{
   };
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6">
-      {/* Карточка с данными профиля и формой изменения части полей */}
-      <div className="rounded-xl border bg-white p-6 text-sm">
-        <h1 className="mb-4 text-lg font-semibold text-slate-900">Профиль</h1>
-        <p className="mb-4 text-xs text-slate-500">
-          Имя, фамилия и телефон в этой версии не изменяются. Можно обновить только
-          e-mail.
-        </p>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
-            {/* Блок редактируемых ФИО и телефона */}
+    <main className="mx-auto max-w-3xl px-4 py-8">
+      <div className="card">
+        {/* Заголовок профиля с иконкой */}
+        <div className="mb-5 flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-100 text-xl">👤</span>
+          <div>
+            <h1 className="text-lg font-bold text-gray-800">Профиль</h1>
+            <p className="text-xs text-gray-400">Управление вашими данными</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs text-slate-600">Имя</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Имя</label>
               <input
                 type="text"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-600">Фамилия</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фамилия</label>
               <input
                 type="text"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-600">Телефон</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Телефон</label>
               <input
                 type="tel"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-600">Роль</label>
-              <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm text-slate-800">
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Роль</label>
+              <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-mint-50 px-4 py-2.5 text-sm font-semibold text-mint-700">
+                <span>{currentUser.role === 'user' ? '👤' : '⚕️'}</span>
                 {currentUser.role === 'user' ? 'Пациент' : 'Специалист'}
               </div>
             </div>
           </div>
 
-          {/* Поле для редактируемого e-mail пользователя */}
           <div>
-            <label className="mb-1 block text-xs text-slate-600">
-              E-mail <span className="text-red-500">*</span>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-600">
+              E-mail <span className="text-red-400">*</span>
             </label>
             <input
               type="email"
-              className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+              className="input-field"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
-          {/* Если есть ошибка — показываем её под полем */}
           {error && (
-            <p className="text-xs text-red-600">
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">
               {error}
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={!email.trim() || isLoading}
-            className="mt-1 w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
-          >
+          <button type="submit" disabled={!email.trim() || isLoading} className="btn-primary w-full">
             {isLoading ? 'Сохранение...' : 'Сохранить изменения'}
           </button>
         </form>
@@ -440,10 +471,7 @@ const BookingPage: React.FC<{
 }> = ({ currentUser, slots, slotsLoading, slotsError, onCreateBooking }) => {
   const navigate = useNavigate();
 
-  // Блок: список дат с доступными слотами.
-  // Нужен, чтобы:
-  // - строить выпадающий список только по реально существующим слотам;
-  // - поддерживать расписание сразу нескольких специалистов без жёсткого id.
+  // Уникальные даты с доступными слотами
   const availableDates = useMemo(() => {
     const dates = new Set(slots.map((s) => s.date));
     return Array.from(dates).sort();
@@ -460,7 +488,6 @@ const BookingPage: React.FC<{
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Если список дат обновился и выбранной даты в нём нет — выбираем первую доступную
   useEffect(() => {
     if (availableDates.length > 0 && !availableDates.includes(selectedDate)) {
       setSelectedDate(availableDates[0]);
@@ -468,22 +495,18 @@ const BookingPage: React.FC<{
     }
   }, [availableDates]);
 
-  // Если пользователь не авторизован как пациент — показываем подсказку
   if (!currentUser || currentUser.role !== 'user') {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-6">
-        <div className="rounded-xl border bg-white p-6 text-sm">
-          <h1 className="mb-2 text-lg font-semibold text-slate-900">
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <div className="card text-center">
+          <span className="mb-3 inline-block text-4xl">📋</span>
+          <h1 className="mb-2 text-lg font-bold text-gray-800">
             Запись доступна только авторизованным пациентам
           </h1>
-          <p className="text-slate-700">
+          <p className="mb-4 text-sm text-gray-500">
             Пожалуйста, войдите в систему как пациент, чтобы выбрать время приёма.
           </p>
-          <button
-            type="button"
-            onClick={() => navigate('/login')}
-            className="mt-4 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-          >
+          <button type="button" onClick={() => navigate('/login')} className="btn-primary">
             Войти
           </button>
         </div>
@@ -491,10 +514,7 @@ const BookingPage: React.FC<{
     );
   }
 
-  // Блок: слоты на выбранную дату.
-  // Нужен, чтобы:
-  // - показывать пациенту все времена приёма на эту дату независимо от специалиста;
-  // - брать specialistId непосредственно из выбранного слота при создании записи.
+  // Слоты на выбранную дату
   const dateSlots = useMemo(
     () => slots.filter((s) => s.date === selectedDate),
     [slots, selectedDate]
@@ -526,30 +546,30 @@ const BookingPage: React.FC<{
   };
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6">
-      {/* Карточка выбора даты и времени */}
-      <section className="mb-4 rounded-xl border bg-white p-4">
-        <h1 className="mb-3 text-lg font-semibold text-slate-900">
-          Запись на приём
-        </h1>
+    <main className="mx-auto max-w-3xl px-4 py-8">
+      {/* Выбор даты и времени */}
+      <section className="card mb-5">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-100 text-xl">📅</span>
+          <h1 className="text-lg font-bold text-gray-800">Запись на приём</h1>
+        </div>
 
-        {/* Состояние загрузки слотов */}
         {slotsLoading && (
-          <div className="mb-3 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-700">
+          <div className="mb-3 rounded-xl bg-mint-50 px-4 py-2.5 text-xs font-semibold text-mint-700">
             Загрузка доступного времени...
           </div>
         )}
         {slotsError && (
-          <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <div className="mb-3 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600">
             {slotsError}
           </div>
         )}
 
-        {/* Выбор даты из тех, на которые специалист принимает */}
-        <div className="mb-3 text-sm">
-          <label className="mb-1 block text-xs text-slate-600">Дата</label>
+        {/* Выбор даты */}
+        <div className="mb-4">
+          <label className="mb-1.5 block text-xs font-semibold text-gray-600">Дата</label>
           <select
-            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+            className="input-field"
             value={availableDates.includes(selectedDate) ? selectedDate : firstDate}
             onChange={(e) => {
               setSelectedDate(e.target.value);
@@ -572,12 +592,12 @@ const BookingPage: React.FC<{
           </select>
         </div>
 
-        {/* Сетка слотов */}
-        <div className="mb-1 text-xs text-slate-600">Время</div>
+        {/* Сетка временных слотов */}
+        <div className="mb-2 text-xs font-semibold text-gray-600">Время</div>
         {!slotsLoading && dateSlots.length === 0 && !slotsError && (
-          <p className="mb-2 text-xs text-slate-500">Нет доступных слотов на выбранную дату.</p>
+          <p className="mb-2 text-xs text-gray-400">Нет доступных слотов на выбранную дату.</p>
         )}
-        <div className="grid grid-cols-3 gap-2 text-xs">
+        <div className="grid grid-cols-3 gap-2">
           {dateSlots.map((slot) => {
             const isBusy = slot.status === 'busy';
             const isSelected = selectedTime === slot.time;
@@ -588,49 +608,49 @@ const BookingPage: React.FC<{
                 disabled={isBusy}
                 onClick={() => setSelectedTime(slot.time)}
                 className={[
-                  'rounded-md border px-2 py-1',
+                  'rounded-xl border-2 px-3 py-2 text-sm font-semibold transition-all',
                   isBusy
-                    ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                    ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300'
                     : isSelected
-                    ? 'border-sky-600 bg-sky-50 text-sky-700'
-                    : 'border-slate-200 text-slate-700 hover:border-sky-500'
+                    ? 'border-mint-500 bg-mint-50 text-mint-700 shadow-sm'
+                    : 'border-gray-100 text-gray-600 hover:border-mint-300 hover:bg-mint-50/50'
                 ].join(' ')}
               >
                 <div>{slot.time}</div>
-                <div className="text-[10px]">
+                <div className="text-[10px] font-normal">
                   {isBusy ? 'Занято' : 'Свободно'}
                 </div>
               </button>
             );
           })}
         </div>
-        <p className="mt-2 text-[11px] text-slate-400">
-          Другие пациенты не видят ваши данные — только статус «Свободно» или
-          «Занято».
+        <p className="mt-3 text-[11px] text-gray-400">
+          Другие пациенты не видят ваши данные — только статус «Свободно» или «Занято».
         </p>
       </section>
 
-      {/* Форма ввода данных пациента и подтверждения */}
-      <section className="rounded-xl border bg-white p-4 text-sm">
-        <h2 className="mb-2 text-base font-semibold text-slate-900">
-          Данные пациента
-        </h2>
+      {/* Данные пациента */}
+      <section className="card">
+        <div className="mb-3 flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-coral-100 text-lg">✍️</span>
+          <h2 className="text-base font-bold text-gray-800">Данные пациента</h2>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <div className="flex-1">
-              <label className="mb-1 block text-xs text-slate-600">Имя</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Имя</label>
               <input
                 type="text"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
               />
             </div>
             <div className="flex-1">
-              <label className="mb-1 block text-xs text-slate-600">Фамилия</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фамилия</label>
               <input
                 type="text"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
               />
@@ -638,34 +658,35 @@ const BookingPage: React.FC<{
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-slate-600">Телефон</label>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-600">Телефон</label>
             <input
               type="tel"
-              className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+              className="input-field"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
           </div>
 
-          {/* Чекбокс подтверждения возраста 18+ */}
-          <label className="flex items-center gap-2 text-xs text-slate-600">
+          {/* Чекбокс подтверждения возраста */}
+          <label className="flex items-center gap-2 text-xs text-gray-600">
             <input
               type="checkbox"
               checked={over18}
               onChange={(e) => setOver18(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-mint-500 focus:ring-mint-400"
             />
-            <span>Мне уже исполнилось 18 лет</span>
+            <span className="font-medium">Мне уже исполнилось 18 лет</span>
           </label>
 
           <button
             type="submit"
             disabled={!selectedTime || !over18 || submitLoading}
-            className="mt-1 w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
+            className="btn-primary w-full"
           >
             {submitLoading ? 'Отправка...' : 'Подтвердить запись'}
           </button>
           {submitError && (
-            <p className="mt-2 text-xs text-red-600">{submitError}</p>
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{submitError}</p>
           )}
         </form>
       </section>
@@ -673,31 +694,24 @@ const BookingPage: React.FC<{
   );
 };
 
-// Страница подтверждения записи
+// Страница подтверждения успешной записи
 const BookingSuccessPage: React.FC = () => {
   return (
-    <main className="mx-auto max-w-md px-4 py-8">
-      {/* Карточка с сообщением об успешной записи */}
-      <div className="rounded-xl border bg-white p-6 text-sm shadow-sm">
-        <h1 className="mb-2 text-lg font-semibold text-slate-900">
-          Вы успешно записаны
-        </h1>
-        <p className="text-slate-700">
+    <main className="mx-auto max-w-md px-4 py-10">
+      <div className="card text-center">
+        <span className="mb-3 inline-block text-5xl">🎉</span>
+        <h1 className="mb-2 text-xl font-bold text-gray-800">Вы успешно записаны!</h1>
+        <p className="mb-4 text-sm text-gray-500">
           Сохраните ссылку для отмены записи, если планы изменятся. Специалист
           получит уведомление о вашей записи.
         </p>
-        <div className="mt-4 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
-          <p className="mb-1 font-semibold text-slate-800">
-            Ссылка для отмены (пример):
-          </p>
-          <code className="block break-all text-[11px] text-slate-700">
+        <div className="mb-5 rounded-xl bg-mint-50 p-4 text-left text-xs">
+          <p className="mb-1 font-bold text-gray-700">Ссылка для отмены (пример):</p>
+          <code className="block break-all text-[11px] text-mint-700">
             https://example.com/cancel?token=demo-token
           </code>
         </div>
-        <Link
-          to="/"
-          className="mt-4 inline-flex rounded-md bg-sky-600 px-4 py-2 text-xs font-medium text-white hover:bg-sky-700"
-        >
+        <Link to="/" className="btn-primary inline-flex">
           На главную
         </Link>
       </div>
@@ -708,24 +722,19 @@ const BookingSuccessPage: React.FC = () => {
 // Страница отмены записи по ссылке
 const CancelBookingPage: React.FC = () => {
   return (
-    <main className="mx-auto max-w-md px-4 py-8">
-      {/* Карточка с подтверждением отмены (в этой версии без реального поиска записи) */}
-      <div className="rounded-xl border bg-white p-6 text-sm shadow-sm">
-        <h1 className="mb-2 text-lg font-semibold text-slate-900">
-          Отмена записи
-        </h1>
-        <p className="text-slate-700">
+    <main className="mx-auto max-w-md px-4 py-10">
+      <div className="card text-center">
+        <span className="mb-3 inline-block text-5xl">🗓️</span>
+        <h1 className="mb-2 text-xl font-bold text-gray-800">Отмена записи</h1>
+        <p className="mb-2 text-sm text-gray-500">
           В этой демо-версии отмена записи не изменяет реальные данные, но показывает
           структуру страницы.
         </p>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mb-5 text-xs text-gray-400">
           В рабочей версии по токену из ссылки будет находиться запись, её статус станет
           «отменён», а специалисту отправится уведомление.
         </p>
-        <Link
-          to="/"
-          className="mt-4 inline-flex rounded-md bg-sky-600 px-4 py-2 text-xs font-medium text-white hover:bg-sky-700"
-        >
+        <Link to="/" className="btn-primary inline-flex">
           На главную
         </Link>
       </div>
@@ -741,7 +750,6 @@ const MyBookingsPage: React.FC<{
   error?: string | null;
   onCancelBooking: (bookingId: string) => Promise<void>;
 }> = ({ currentUser, bookings, isLoading, error, onCancelBooking }) => {
-  // Фильтруем только активные записи текущего пациента
   const userBookings = useMemo(
     () =>
       bookings.filter(
@@ -752,12 +760,13 @@ const MyBookingsPage: React.FC<{
 
   if (!currentUser || currentUser.role !== 'user') {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-6">
-        <div className="rounded-xl border bg-white p-6 text-sm">
-          <h1 className="mb-2 text-lg font-semibold text-slate-900">
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <div className="card text-center">
+          <span className="mb-3 inline-block text-4xl">🔒</span>
+          <h1 className="mb-2 text-lg font-bold text-gray-800">
             Раздел доступен только пациентам
           </h1>
-          <p className="text-slate-700">
+          <p className="text-sm text-gray-500">
             Войдите как пациент, чтобы просмотреть ваши записи.
           </p>
         </div>
@@ -766,41 +775,44 @@ const MyBookingsPage: React.FC<{
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6">
-      {/* Карточка со списком записей пациента */}
-      <div className="rounded-xl border bg-white p-6 text-sm">
-        <h1 className="mb-4 text-lg font-semibold text-slate-900">Мои записи</h1>
-        {/* Если идёт «загрузка» — показываем заглушку с индикатором */}
+    <main className="mx-auto max-w-3xl px-4 py-8">
+      <div className="card">
+        <div className="mb-5 flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-100 text-xl">📋</span>
+          <h1 className="text-lg font-bold text-gray-800">Мои записи</h1>
+        </div>
+
         {isLoading && (
-          <div className="rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-700">
+          <div className="rounded-xl bg-mint-50 px-4 py-2.5 text-xs font-semibold text-mint-700">
             Загрузка списка записей...
           </div>
         )}
 
-        {/* Если произошла «ошибка» — показываем сообщение об ошибке */}
         {!isLoading && error && (
-          <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <div className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600">
             {error}
           </div>
         )}
 
-        {/* Если нет загрузки и ошибки — показываем реальный список записей */}
         {!isLoading && !error && (
           <>
             {userBookings.length === 0 && (
-              <p className="text-slate-600">У вас пока нет активных записей.</p>
+              <div className="py-6 text-center">
+                <span className="mb-2 inline-block text-3xl">📭</span>
+                <p className="text-sm text-gray-500">У вас пока нет активных записей.</p>
+              </div>
             )}
             <ul className="space-y-2">
               {userBookings.map((b) => (
                 <li
                   key={b.id}
-                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 transition-colors hover:bg-mint-50/30"
                 >
                   <div className="flex flex-col">
-                    <span className="text-xs text-slate-700">
+                    <span className="text-sm font-semibold text-gray-700">
                       {new Date(b.date).toLocaleDateString('ru-RU')}, {b.time}
                     </span>
-                    <span className="text-[11px] text-slate-500">
+                    <span className="text-xs text-gray-400">
                       Специалист:{' '}
                       {(b.specialistLastName || b.specialistFirstName)
                         ? `${b.specialistLastName ?? ''} ${b.specialistFirstName ?? ''}`.trim()
@@ -808,18 +820,17 @@ const MyBookingsPage: React.FC<{
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-500">Статус: активна</span>
+                    <span className="rounded-full bg-mint-100 px-2.5 py-0.5 text-[11px] font-bold text-mint-700">
+                      Активна
+                    </span>
                     <button
                       type="button"
                       onClick={async () => {
-                        // Этот блок создаётся, чтобы:
-                        // - запросить у пациента подтверждение отмены записи;
-                        // - избежать случайного нажатия на кнопку "Отменить".
                         const ok = window.confirm('Вы уверены, что хотите отменить эту запись?');
                         if (!ok) return;
                         await onCancelBooking(b.id);
                       }}
-                      className="rounded-md border border-red-200 px-3 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50"
+                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50"
                     >
                       Отменить
                     </button>
@@ -866,13 +877,11 @@ const SpecialistSchedulePage: React.FC<{
   onCreateSlotsBatch,
   onDeleteSlot
 }) => {
-  // Минимальная дата для выбора — сегодня (формат YYYY-MM-DD для input type="date")
   const today = useMemo(() => {
     const d = new Date();
     return d.toISOString().slice(0, 10);
   }, []);
 
-  // Список дат, по которым у специалиста уже есть слоты (для выбора в «Записать пациента»)
   const availableDatesForSpecialist = useMemo(() => {
     if (!currentUser) return [];
     const dates = new Set(
@@ -888,16 +897,13 @@ const SpecialistSchedulePage: React.FC<{
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
-  // Время одного нового слота
   const [newSlotTime, setNewSlotTime] = useState('');
-  // Диапазон для добавления нескольких слотов (часы приёма)
   const [batchStartTime, setBatchStartTime] = useState('');
   const [batchEndTime, setBatchEndTime] = useState('');
   const [batchStepMin, setBatchStepMin] = useState(30);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Поддерживаем выбранную дату в списке доступных (для блока «Записать пациента»)
   useEffect(() => {
     if (
       availableDatesForSpecialist.length > 0 &&
@@ -910,12 +916,13 @@ const SpecialistSchedulePage: React.FC<{
 
   if (!currentUser || currentUser.role !== 'specialist') {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-6">
-        <div className="rounded-xl border bg-white p-6 text-sm">
-          <h1 className="mb-2 text-lg font-semibold text-slate-900">
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <div className="card text-center">
+          <span className="mb-3 inline-block text-4xl">🔒</span>
+          <h1 className="mb-2 text-lg font-bold text-gray-800">
             Раздел доступен только специалистам
           </h1>
-          <p className="text-slate-700">
+          <p className="text-sm text-gray-500">
             Войдите как специалист, чтобы просмотреть своё расписание.
           </p>
         </div>
@@ -923,7 +930,6 @@ const SpecialistSchedulePage: React.FC<{
     );
   }
 
-  // Фильтр записей только текущего специалиста
   const specialistBookings = useMemo(
     () =>
       bookings.filter(
@@ -932,7 +938,6 @@ const SpecialistSchedulePage: React.FC<{
     [bookings, currentUser]
   );
 
-  // Свободные слоты для формы ручной записи
   const dateSlots = useMemo(
     () =>
       slots.filter(
@@ -1031,56 +1036,60 @@ const SpecialistSchedulePage: React.FC<{
   };
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6">
+    <main className="mx-auto max-w-5xl px-4 py-8">
+      {/* Блок ошибок */}
       {slotsError && (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div className="mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600">
           {slotsError}
         </div>
       )}
       {bookingsError && (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div className="mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600">
           {bookingsError}
         </div>
       )}
       {actionError && (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div className="mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600">
           {actionError}
         </div>
       )}
-      {/* Верхний блок с таблицей записей */}
-      <section className="mb-4 rounded-xl border bg-white p-4 text-sm">
-        <h1 className="mb-3 text-lg font-semibold text-slate-900">
-          Расписание записей
-        </h1>
+
+      {/* Таблица записей */}
+      <section className="card mb-5">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-100 text-xl">📊</span>
+          <h1 className="text-lg font-bold text-gray-800">Расписание записей</h1>
+        </div>
         {bookingsLoading && (
-          <p className="text-xs text-sky-700">Загрузка записей...</p>
+          <p className="text-xs font-semibold text-mint-700">Загрузка записей...</p>
         )}
         {!bookingsLoading && specialistBookings.length === 0 ? (
-          <p className="text-slate-600">
-            На выбранный период у вас пока нет записей.
-          </p>
+          <div className="py-4 text-center">
+            <span className="mb-2 inline-block text-3xl">📭</span>
+            <p className="text-sm text-gray-500">На выбранный период у вас пока нет записей.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-xs">
               <thead>
-                <tr className="border-b bg-slate-50 text-[11px] uppercase text-slate-500">
-                  <th className="px-3 py-2">Дата</th>
-                  <th className="px-3 py-2">Время</th>
-                  <th className="px-3 py-2">Фамилия</th>
-                  <th className="px-3 py-2">Имя</th>
-                  <th className="px-3 py-2">Телефон</th>
+                <tr className="border-b border-gray-100 text-[11px] font-bold uppercase text-gray-400">
+                  <th className="px-3 py-2.5">Дата</th>
+                  <th className="px-3 py-2.5">Время</th>
+                  <th className="px-3 py-2.5">Фамилия</th>
+                  <th className="px-3 py-2.5">Имя</th>
+                  <th className="px-3 py-2.5">Телефон</th>
                 </tr>
               </thead>
               <tbody>
                 {specialistBookings.map((b) => (
-                  <tr key={b.id} className="border-b last:border-0">
-                    <td className="px-3 py-2">
+                  <tr key={b.id} className="border-b border-gray-50 last:border-0 hover:bg-mint-50/30">
+                    <td className="px-3 py-2.5 font-semibold text-gray-700">
                       {new Date(b.date).toLocaleDateString('ru-RU')}
                     </td>
-                    <td className="px-3 py-2">{b.time}</td>
-                    <td className="px-3 py-2">{b.lastName}</td>
-                    <td className="px-3 py-2">{b.firstName}</td>
-                    <td className="px-3 py-2">{b.phone ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-gray-600">{b.time}</td>
+                    <td className="px-3 py-2.5 text-gray-600">{b.lastName}</td>
+                    <td className="px-3 py-2.5 text-gray-600">{b.firstName}</td>
+                    <td className="px-3 py-2.5 text-gray-600">{b.phone ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1089,21 +1098,22 @@ const SpecialistSchedulePage: React.FC<{
         )}
       </section>
 
-      {/* Блок настройки собственного расписания: добавление дат и часов приёма */}
-      <section className="mb-4 rounded-xl border bg-white p-4 text-sm">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">
-          Настройка расписания приёма
-        </h2>
-        <p className="mb-3 text-xs text-slate-600">
-          Выберите дату и добавьте один слот или несколько слотов подряд (диапазон времени).
-        </p>
+      {/* Настройка расписания */}
+      <section className="card mb-5">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-coral-100 text-xl">⚙️</span>
+          <div>
+            <h2 className="text-base font-bold text-gray-800">Настройка расписания приёма</h2>
+            <p className="text-xs text-gray-400">Добавьте дату и часы, когда вы готовы принимать</p>
+          </div>
+        </div>
 
-        {/* Выбор даты для добавления слотов — любая дата начиная с сегодня */}
-        <div className="mb-3">
-          <label className="mb-1 block text-xs text-slate-600">Дата для записи</label>
+        {/* Выбор даты */}
+        <div className="mb-4">
+          <label className="mb-1.5 block text-xs font-semibold text-gray-600">Дата для записи</label>
           <input
             type="date"
-            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+            className="input-field"
             value={selectedDate}
             min={today}
             onChange={(e) => {
@@ -1113,58 +1123,52 @@ const SpecialistSchedulePage: React.FC<{
           />
         </div>
 
-        {/* Добавление одного слота (один час) */}
-        <form onSubmit={handleCreateSlot} className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs text-slate-600">
-              Добавить один час приёма
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="time"
-                className="flex-1 rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
-                value={newSlotTime}
-                onChange={(e) => setNewSlotTime(e.target.value)}
-              />
-              <button
-                type="submit"
-                disabled={!newSlotTime || actionLoading}
-                className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
-              >
-                Добавить слот
-              </button>
-            </div>
+        {/* Добавление одного слота */}
+        <form onSubmit={handleCreateSlot} className="mb-4 space-y-3">
+          <label className="mb-1.5 block text-xs font-semibold text-gray-600">
+            Добавить один час приёма
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="time"
+              className="input-field flex-1"
+              value={newSlotTime}
+              onChange={(e) => setNewSlotTime(e.target.value)}
+            />
+            <button type="submit" disabled={!newSlotTime || actionLoading} className="btn-primary">
+              Добавить слот
+            </button>
           </div>
         </form>
 
-        {/* Добавление нескольких слотов подряд (диапазон часов) */}
-        <form onSubmit={handleCreateSlotsBatch} className="mt-4 space-y-3 rounded-md border border-slate-100 bg-slate-50/50 p-3">
-          <h3 className="text-xs font-semibold uppercase text-slate-500">
+        {/* Добавление нескольких слотов (диапазон) */}
+        <form onSubmit={handleCreateSlotsBatch} className="rounded-2xl border border-mint-100 bg-mint-50/30 p-4">
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-gray-500">
             Добавить несколько часов подряд
           </h3>
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-[100px]">
-              <label className="mb-1 block text-xs text-slate-600">С</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">С</label>
               <input
                 type="time"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={batchStartTime}
                 onChange={(e) => setBatchStartTime(e.target.value)}
               />
             </div>
             <div className="min-w-[100px]">
-              <label className="mb-1 block text-xs text-slate-600">До</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">До</label>
               <input
                 type="time"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={batchEndTime}
                 onChange={(e) => setBatchEndTime(e.target.value)}
               />
             </div>
             <div className="min-w-[80px]">
-              <label className="mb-1 block text-xs text-slate-600">Шаг (мин)</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Шаг (мин)</label>
               <select
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={batchStepMin}
                 onChange={(e) => setBatchStepMin(Number(e.target.value))}
               >
@@ -1176,7 +1180,7 @@ const SpecialistSchedulePage: React.FC<{
             <button
               type="submit"
               disabled={!batchStartTime || !batchEndTime || actionLoading}
-              className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
+              className="btn-primary"
             >
               Добавить слоты
             </button>
@@ -1184,31 +1188,30 @@ const SpecialistSchedulePage: React.FC<{
         </form>
 
         {/* Список свободных слотов */}
-        <div className="mt-4">
-          <h3 className="mb-2 text-xs font-semibold uppercase text-slate-500">
+        <div className="mt-5">
+          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">
             Свободные слоты на выбранную дату
           </h3>
-          {slotsLoading && <p className="text-xs text-sky-700">Загрузка слотов...</p>}
+          {slotsLoading && <p className="text-xs font-semibold text-mint-700">Загрузка слотов...</p>}
           {!slotsLoading && dateSlots.length === 0 ? (
-            <p className="text-xs text-slate-600">
-              На выбранную дату свободные слоты не заданы. Добавьте время, когда вы готовы
-              принимать.
-            </p>
+            <div className="rounded-xl bg-gray-50 py-4 text-center text-xs text-gray-400">
+              Свободные слоты не заданы. Добавьте время приёма выше.
+            </div>
           ) : (
-            <ul className="space-y-1 text-xs">
+            <ul className="space-y-1.5">
               {dateSlots.map((slot) => (
                 <li
                   key={slot.id}
-                  className="flex items-center justify-between rounded-md border px-3 py-1.5"
+                  className="flex items-center justify-between rounded-xl border border-gray-100 bg-white px-4 py-2 transition-colors hover:bg-mint-50/30"
                 >
-                  <span className="text-slate-800">{slot.time}</span>
+                  <span className="text-sm font-semibold text-gray-700">{slot.time}</span>
                   <button
                     type="button"
                     onClick={() => handleDeleteSlot(slot.id)}
                     disabled={actionLoading}
-                    className="rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                   >
-                    Не принимаю в это время
+                    Убрать
                   </button>
                 </li>
               ))}
@@ -1217,17 +1220,18 @@ const SpecialistSchedulePage: React.FC<{
         </div>
       </section>
 
-      {/* Блок: форма «Записать пациента» — даты берутся из уже добавленных слотов */}
-      <section className="rounded-xl border bg-white p-4 text-sm">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">
-          Записать пациента
-        </h2>
+      {/* Форма «Записать пациента» */}
+      <section className="card">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-warm-100 text-xl">✍️</span>
+          <h2 className="text-base font-bold text-gray-800">Записать пациента</h2>
+        </div>
         <form onSubmit={handleCreate} className="space-y-3">
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <div className="flex-1">
-              <label className="mb-1 block text-xs text-slate-600">Дата</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Дата</label>
               <select
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={
                   availableDatesForSpecialist.includes(selectedDate)
                     ? selectedDate
@@ -1239,7 +1243,7 @@ const SpecialistSchedulePage: React.FC<{
                 }}
               >
                 {availableDatesForSpecialist.length === 0 ? (
-                  <option value="">Сначала добавьте даты и часы в расписании выше</option>
+                  <option value="">Сначала добавьте даты и часы выше</option>
                 ) : (
                   availableDatesForSpecialist.map((d) => (
                     <option key={d} value={d}>
@@ -1254,9 +1258,9 @@ const SpecialistSchedulePage: React.FC<{
               </select>
             </div>
             <div className="flex-1">
-              <label className="mb-1 block text-xs text-slate-600">Свободные слоты</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Свободные слоты</label>
               <select
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={selectedTime ?? ''}
                 onChange={(e) => setSelectedTime(e.target.value || null)}
               >
@@ -1270,21 +1274,21 @@ const SpecialistSchedulePage: React.FC<{
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <div className="flex-1">
-              <label className="mb-1 block text-xs text-slate-600">Имя</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Имя</label>
               <input
                 type="text"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
               />
             </div>
             <div className="flex-1">
-              <label className="mb-1 block text-xs text-slate-600">Фамилия</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фамилия</label>
               <input
                 type="text"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                className="input-field"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
               />
@@ -1292,10 +1296,10 @@ const SpecialistSchedulePage: React.FC<{
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-slate-600">Телефон</label>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-600">Телефон</label>
             <input
               type="tel"
-              className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+              className="input-field"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
@@ -1304,13 +1308,12 @@ const SpecialistSchedulePage: React.FC<{
           <button
             type="submit"
             disabled={!selectedTime || availableDatesForSpecialist.length === 0 || actionLoading}
-            className="w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
+            className="btn-primary w-full"
           >
             {actionLoading ? 'Создание...' : 'Создать запись'}
           </button>
-          <p className="mt-1 text-[11px] text-slate-400">
-            Пациент не видит ФИО других пациентов — только статус свободного или занятого
-            слота.
+          <p className="mt-1 text-[11px] text-gray-400">
+            Пациент не видит ФИО других пациентов — только статус свободного или занятого слота.
           </p>
         </form>
       </section>
@@ -1336,12 +1339,13 @@ const SpecialistNewsPage: React.FC<{
 
   if (!currentUser || currentUser.role !== 'specialist') {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-6">
-        <div className="rounded-xl border bg-white p-6 text-sm">
-          <h1 className="mb-2 text-lg font-semibold text-slate-900">
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <div className="card text-center">
+          <span className="mb-3 inline-block text-4xl">🔒</span>
+          <h1 className="mb-2 text-lg font-bold text-gray-800">
             Раздел доступен только специалистам
           </h1>
-          <p className="text-slate-700">
+          <p className="text-sm text-gray-500">
             Войдите как специалист, чтобы управлять новостями.
           </p>
         </div>
@@ -1372,104 +1376,98 @@ const SpecialistNewsPage: React.FC<{
   };
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6">
+    <main className="mx-auto max-w-5xl px-4 py-8">
       {newsError && (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div className="mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600">
           {newsError}
         </div>
       )}
       {error && (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div className="mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600">
           {error}
         </div>
       )}
-      <section className="mb-4 rounded-xl border bg-white p-4 text-sm">
-        <h1 className="mb-3 text-lg font-semibold text-slate-900">
-          Управление новостями
-        </h1>
+
+      {/* Форма добавления/редактирования новости */}
+      <section className="card mb-5">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-coral-100 text-xl">📝</span>
+          <h1 className="text-lg font-bold text-gray-800">Управление новостями</h1>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs text-slate-600">Заголовок</label>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-600">Заголовок</label>
             <input
               type="text"
-              className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+              className="input-field"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-600">
+            <label className="mb-1.5 block text-xs font-semibold text-gray-600">
               Краткий текст (описание)
             </label>
             <textarea
-              className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+              className="input-field resize-none"
               rows={3}
               value={excerpt}
               onChange={(e) => setExcerpt(e.target.value)}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-600">
-              URL картинки (для прототипа)
+            <label className="mb-1.5 block text-xs font-semibold text-gray-600">
+              URL картинки
             </label>
             <input
               type="text"
-              className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+              className="input-field"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
             />
           </div>
-          <button
-            type="submit"
-            disabled={!title || !imageUrl || isLoading}
-            className="w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
-          >
+          <button type="submit" disabled={!title || !imageUrl || isLoading} className="btn-primary w-full">
             {isLoading ? 'Сохранение...' : editingId ? 'Сохранить изменения' : 'Добавить новость'}
           </button>
-          <p className="mt-1 text-[11px] text-slate-400">
-            В будущем здесь можно будет настроить автоматическую загрузку новостей (RSS,
-            API) по темам ЛФК и здоровья детей.
-          </p>
         </form>
       </section>
 
-      <section className="rounded-xl border bg-white p-4 text-sm">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Текущие новости</h2>
+      {/* Список текущих новостей */}
+      <section className="card">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-100 text-xl">📰</span>
+          <h2 className="text-base font-bold text-gray-800">Текущие новости</h2>
+        </div>
         {newsLoading && (
-          <p className="text-xs text-sky-700">Загрузка новостей...</p>
+          <p className="text-xs font-semibold text-mint-700">Загрузка новостей...</p>
         )}
         {!newsLoading && (
-        <div className="grid gap-4 md:grid-cols-3">
-          {news.map((item) => (
-            <div key={item.id} className="flex flex-col gap-2">
-              {/* Карточка новости в виде превью */}
-              <NewsCard item={item} />
-              {/* Кнопка «Редактировать» для перехода в режим изменения новости */}
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingId(item.id);
-                  setTitle(item.title);
-                  setExcerpt(item.excerpt);
-                  setImageUrl(item.imageUrl);
-                }}
-                className="rounded-md border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
-              >
-                Редактировать
-              </button>
-            </div>
-          ))}
-        </div>
+          <div className="grid gap-5 md:grid-cols-3">
+            {news.map((item) => (
+              <div key={item.id} className="flex flex-col gap-2">
+                <NewsCard item={item} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingId(item.id);
+                    setTitle(item.title);
+                    setExcerpt(item.excerpt);
+                    setImageUrl(item.imageUrl);
+                  }}
+                  className="btn-secondary text-xs"
+                >
+                  Редактировать
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </section>
     </main>
   );
 };
 
-// Корневой компонент App — хранит состояние, загружает данные через API
-// Этот блок создаётся, чтобы:
-// - получать текущего пользователя через useClerkAuth (Clerk + sync-from-clerk);
-// - загружать новости, слоты и записи через API с Bearer-токеном.
+// Корневой компонент App — хранит глобальное состояние, загружает данные через API
 const App: React.FC = () => {
   const { user: currentUser, loading: authLoading, needsRoleSelect, roleSelectEmail, completeRoleSelect, getToken, refreshUser } = useClerkAuth();
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -1651,12 +1649,44 @@ const App: React.FC = () => {
     if (created.length > 0) setSlots((prev) => [...prev, ...created]);
   }, [currentUser, getToken]);
 
-  // Когда нужен выбор роли (профиль не синхронизирован с бэкендом)
+  // Общая тема Clerk — нужна, чтобы формы входа и регистрации визуально совпадали с новым дизайном сайта
+  const clerkAppearance = useMemo(
+    () => ({
+      variables: {
+        colorPrimary: '#22c55e',
+        colorBackground: '#ffffff',
+        colorText: '#1f2937',
+        colorInputBackground: '#ffffff',
+        colorInputText: '#1f2937',
+        borderRadius: '14px',
+        fontFamily: 'Nunito, system-ui, sans-serif',
+      },
+      elements: {
+        card: 'shadow-soft border border-mint-100 rounded-2xl',
+        headerTitle: 'text-gray-800 font-extrabold',
+        headerSubtitle: 'text-gray-500',
+        socialButtonsBlockButton:
+          'rounded-xl border border-gray-200 text-gray-700 hover:bg-mint-50 hover:border-mint-200',
+        dividerLine: 'bg-gray-100',
+        dividerText: 'text-gray-400',
+        formFieldLabel: 'text-gray-600 font-semibold',
+        formFieldInput:
+          'rounded-xl border border-gray-200 focus:border-mint-400 focus:ring-2 focus:ring-mint-100',
+        formButtonPrimary: 'bg-mint-500 hover:bg-mint-600 text-white rounded-xl font-bold',
+        footerActionText: 'text-gray-500',
+        footerActionLink: 'text-mint-600 hover:text-mint-700 font-semibold',
+        identityPreviewText: 'text-gray-600',
+      },
+    }),
+    []
+  );
+
+  // Экран выбора роли при первом входе
   if (needsRoleSelect) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-gradient-to-br from-mint-50 via-white to-warm-50">
         <Header currentUser={null} />
-        <main className="flex min-h-[70vh] items-center justify-center px-4 py-6">
+        <main className="flex min-h-[70vh] items-center justify-center px-4 py-8">
           <RoleSelectForm email={roleSelectEmail} onComplete={completeRoleSelect} />
         </main>
       </div>
@@ -1664,7 +1694,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-mint-50 via-white to-warm-50">
       <Header currentUser={currentUser} />
       <Routes>
         <Route
@@ -1678,27 +1708,54 @@ const App: React.FC = () => {
             />
           }
         />
-        {/* Роуты авторизации/регистрации Clerk.
-            Используем путь с /*, чтобы обрабатывать вложенные URL вида /login/factor-one. */}
         <Route
           path="/login/*"
           element={
-            <main className="flex min-h-[70vh] items-center justify-center bg-slate-50 px-4 py-6">
+            <main className="flex min-h-[70vh] items-center justify-center px-4 py-8">
+              {/* Обёртка нужна, чтобы форма авторизации выглядела как карточка текущего дизайна сайта */}
+              <div className="w-full max-w-md rounded-3xl bg-gradient-to-br from-mint-100/60 via-white to-warm-50 p-4 shadow-soft">
+              {/* Заголовок нужен, чтобы сразу объяснить пользователю назначение экрана входа */}
+              <div className="mb-3 rounded-2xl bg-white/80 p-4 text-center shadow-sm">
+                <div className="mb-1 text-3xl">🔐</div>
+                <h1 className="text-lg font-extrabold text-gray-800">Вход в личный кабинет</h1>
+                <p className="mt-1 text-xs text-gray-500">
+                  Авторизуйтесь, чтобы записаться на занятия ЛФК
+                </p>
+              </div>
               <SignIn
                 routing="path"
                 path="/login"
                 signUpUrl="/register"
                 afterSignInUrl="/"
                 afterSignOutUrl="/"
+                appearance={clerkAppearance}
               />
+              </div>
             </main>
           }
         />
         <Route
           path="/register/*"
           element={
-            <main className="flex min-h-[70vh] items-center justify-center bg-slate-50 px-4 py-6">
-              <SignUp routing="path" path="/register" signInUrl="/login" afterSignUpUrl="/" />
+            <main className="flex min-h-[70vh] items-center justify-center px-4 py-8">
+              {/* Обёртка нужна, чтобы форма регистрации выглядела как карточка текущего дизайна сайта */}
+              <div className="w-full max-w-md rounded-3xl bg-gradient-to-br from-mint-100/60 via-white to-warm-50 p-4 shadow-soft">
+                {/* Заголовок нужен, чтобы сделать экран регистрации понятным и дружелюбным */}
+                <div className="mb-3 rounded-2xl bg-white/80 p-4 text-center shadow-sm">
+                  <div className="mb-1 text-3xl">✨</div>
+                  <h1 className="text-lg font-extrabold text-gray-800">Регистрация</h1>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Создайте аккаунт для записи и управления посещениями
+                  </p>
+                </div>
+                <SignUp
+                  routing="path"
+                  path="/register"
+                  signInUrl="/login"
+                  afterSignUpUrl="/"
+                  appearance={clerkAppearance}
+                />
+              </div>
             </main>
           }
         />
@@ -1770,9 +1827,16 @@ const App: React.FC = () => {
           }
         />
       </Routes>
+
+      {/* Футер сайта */}
+      <footer className="mt-12 border-t border-gray-100 bg-white/60 backdrop-blur-sm">
+        <div className="mx-auto max-w-5xl px-4 py-6 text-center text-xs text-gray-400">
+          <p className="font-semibold text-gray-500">🧒 Детский ЛФК</p>
+          <p className="mt-1">Запись на приём к специалисту по лечебной физкультуре</p>
+        </div>
+      </footer>
     </div>
   );
 };
 
 export default App;
-

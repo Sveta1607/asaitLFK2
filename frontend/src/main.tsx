@@ -6,6 +6,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, useNavigate } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/clerk-react';
+import { ruRU } from '@clerk/localizations';
 import './index.css';
 import App from './App';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -18,6 +19,20 @@ if (!publishableKey) {
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element #root not found');
 
+// Кастомная локализация нужна, чтобы убрать название приложения из заголовка входа
+// и всегда показывать пользовательские русские тексты.
+const clerkLocalization = {
+  ...ruRU,
+  signIn: {
+    ...ruRU.signIn,
+    start: {
+      ...ruRU.signIn?.start,
+      title: 'Войти на сайт',
+      subtitle: 'Войдите, чтобы продолжить работу',
+    },
+  },
+};
+
 // Обёртка создаётся, чтобы связать Clerk navigation с react-router (routing="path").
 // Без этого Clerk может некорректно делать редиректы после входа/регистрации,
 // что приводит к "нет сессии" и необходимости чистить cookies.
@@ -28,6 +43,8 @@ function ClerkWithRouter({ children }: { children: React.ReactNode }) {
       publishableKey={publishableKey}
       routerPush={(to) => navigate(to)}
       routerReplace={(to) => navigate(to, { replace: true })}
+      // Глобальная локализация нужна, чтобы ВСЕ встроенные экраны Clerk (вход/регистрация/ошибки) были на русском языке.
+      localization={clerkLocalization}
     >
       {children}
     </ClerkProvider>
