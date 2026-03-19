@@ -12,6 +12,10 @@ RUN npm ci
 ARG VITE_API_URL=https://lfk-b-svetlanagolovchanskaya.amvera.io/api
 ENV VITE_API_URL=${VITE_API_URL}
 
+# Этот блок создаётся, чтобы Clerk-ключ попал в продакшен-сборку (publishable key — публичный).
+ARG VITE_CLERK_PUBLISHABLE_KEY=pk_test_aHVtb3JvdXMtbW9sbHktNTUuY2xlcmsuYWNjb3VudHMuZGV2JA
+ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
+
 # Этот блок создаётся, чтобы собрать production-версию фронтенда.
 COPY . .
 RUN npm run build
