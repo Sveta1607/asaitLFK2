@@ -12,7 +12,7 @@ from typing import Generator
 
 import os
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
@@ -37,6 +37,53 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, clas
 # Блок: базовый класс для ORM-моделей.
 # Нужен, чтобы все модели наследовали общую Metadata и могли создавать таблицы через Base.metadata.
 Base = declarative_base()
+
+
+def _ensure_sqlite_users_columns() -> None:
+    """
+    Этот хелпер создаётся, чтобы:
+    - мягко обновлять legacy SQLite-схему в постоянном хранилище Amvera;
+    - добавлять новые колонки в users без ручной миграции;
+    - устранять падения вида "no such column: users.username".
+    """
+    # Этот блок создаётся, чтобы применять совместимость только для SQLite.
+    if not str(engine.url).startswith("sqlite"):
+        return
+
+    # Этот блок создаётся, чтобы безопасно проверить существующие колонки users.
+    with engine.begin() as conn:
+        table_exists = conn.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        ).first()
+        if not table_exists:
+            return
+
+        existing_columns = {
+            row[1] for row in conn.execute(text("PRAGMA table_info('users')")).fetchall()
+        }
+
+        # Этот блок создаётся, чтобы дозаполнить только отсутствующие поля,
+        # которые используются текущим кодом и запросами SQLAlchemy.
+        alter_statements = []
+        if "clerk_id" not in existing_columns:
+            alter_statements.append("ALTER TABLE users ADD COLUMN clerk_id TEXT")
+        if "username" not in existing_columns:
+            alter_statements.append("ALTER TABLE users ADD COLUMN username TEXT")
+        if "first_name" not in existing_columns:
+            alter_statements.append("ALTER TABLE users ADD COLUMN first_name TEXT")
+        if "last_name" not in existing_columns:
+            alter_statements.append("ALTER TABLE users ADD COLUMN last_name TEXT")
+        if "phone" not in existing_columns:
+            alter_statements.append("ALTER TABLE users ADD COLUMN phone TEXT")
+        if "approved" not in existing_columns:
+            alter_statements.append("ALTER TABLE users ADD COLUMN approved INTEGER NOT NULL DEFAULT 1")
+        if "created_at" not in existing_columns:
+            alter_statements.append("ALTER TABLE users ADD COLUMN created_at DATETIME")
+        if "updated_at" not in existing_columns:
+            alter_statements.append("ALTER TABLE users ADD COLUMN updated_at DATETIME")
+
+        for statement in alter_statements:
+            conn.execute(text(statement))
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -74,6 +121,7 @@ def init_db() -> None:
     #   автоматически переключиться на SQLite и не падать на старте в облаке.
     try:
         Base.metadata.create_all(bind=engine)
+        _ensure_sqlite_users_columns()
     except OperationalError as exc:
         db_url = os.getenv("DATABASE_URL", "")
         is_local_postgres = (
@@ -93,6 +141,7 @@ def init_db() -> None:
         engine = create_engine(fallback_url, echo=False, future=True)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
         Base.metadata.create_all(bind=engine)
+        _ensure_sqlite_users_columns()
 
     # Добавляем начальные данные один раз.
     with SessionLocal() as session:
