@@ -1,13 +1,14 @@
-# Этот блок создаётся, чтобы Amvera знала, что фронтенд собирается через Docker.
+# Этот блок создаётся, чтобы явно указать Docker-окружение сборки на Amvera.
 meta:
   environment: docker
   toolchain:
     name: docker
 
-# Этот блок создаётся, чтобы Amvera нашла Dockerfile в корне папки frontend.
+# Этот блок создаётся, чтобы Amvera использовала именно backend Dockerfile,
+# где устанавливаются зависимости включая PyJWT.
 build:
-  dockerfile: Dockerfile
+  dockerfile: backend/Dockerfile
 
-# Этот блок создаётся, чтобы Amvera слушала порт 80 (Nginx внутри контейнера).
+# Этот блок создаётся, чтобы маршрутизация Amvera шла на API-порт backend.
 run:
-  containerPort: 80
+  containerPort: 3000

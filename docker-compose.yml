@@ -1,0 +1,47 @@
+# Этот блок создаётся, чтобы оркестрировать два изолированных сервиса в одном деплое.
+services:
+  # Этот блок создаётся, чтобы запускать backend как отдельный масштабируемый API-сервис.
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lfk-backend
+    environment:
+      # Этот блок создаётся, чтобы API слушал стандартный порт и внешний интерфейс.
+      HOST: 0.0.0.0
+      PORT: 3000
+    ports:
+      # Этот блок создаётся, чтобы открыть API на хосте для внешней проверки.
+      - "3000:3000"
+    networks:
+      # Этот блок создаётся, чтобы frontend обращался к backend по имени сервиса.
+      - app_net
+    restart: unless-stopped
+
+  # Этот блок создаётся, чтобы запускать frontend как отдельный статический веб-сервис.
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Этот блок создаётся, чтобы зашить URL API в production-сборку фронтенда.
+        VITE_API_URL: ${VITE_API_URL:-https://lfk-b-svetlanagolovchanskaya.amvera.io/api}
+    container_name: lfk-frontend
+    environment:
+      # Этот блок создаётся, чтобы зафиксировать текущее значение API URL в метаданных сервиса.
+      VITE_API_URL: ${VITE_API_URL:-https://lfk-b-svetlanagolovchanskaya.amvera.io/api}
+    depends_on:
+      # Этот блок создаётся, чтобы старт фронтенда происходил после старта backend-контейнера.
+      - backend
+    ports:
+      # Этот блок создаётся, чтобы открыть сайт на порту 8080 хоста.
+      - "8080:80"
+    networks:
+      # Этот блок создаётся, чтобы использовать ту же стандартную сеть для HTTP-вызовов.
+      - app_net
+    restart: unless-stopped
+
+# Этот блок создаётся, чтобы контейнеры взаимодействовали только через стандартную bridge-сеть.
+networks:
+  app_net:
+    driver: bridge

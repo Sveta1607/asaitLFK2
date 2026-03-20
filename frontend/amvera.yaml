@@ -1,0 +1,13 @@
+# Этот блок создаётся, чтобы Amvera знала, что фронтенд собирается через Docker.
+meta:
+  environment: docker
+  toolchain:
+    name: docker
+
+# Этот блок создаётся, чтобы Amvera нашла Dockerfile в корне папки frontend.
+build:
+  dockerfile: Dockerfile
+
+# Этот блок создаётся, чтобы Amvera слушала порт 80 (Nginx внутри контейнера).
+run:
+  containerPort: 80
