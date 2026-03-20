@@ -2059,6 +2059,8 @@ const App: React.FC = () => {
         <div className="mx-auto max-w-5xl px-4 py-6 text-center text-xs text-gray-400">
           <p className="font-semibold text-gray-500">🧒 Детский ЛФК</p>
           <p className="mt-1">Запись на приём к специалисту по лечебной физкультуре</p>
+          {/* Этот блок создаётся, чтобы добавить в футер фирменную подпись проекта. */}
+          <p className="mt-2 text-sm text-gray-500">Сделано с любовью</p>
         </div>
       </footer>
     </div>
