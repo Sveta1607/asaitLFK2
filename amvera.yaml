@@ -1,14 +1,16 @@
-# Этот блок создаётся, чтобы явно указать Docker-окружение сборки на Amvera.
+---
 meta:
   environment: docker
   toolchain:
     name: docker
-
-# Этот блок создаётся, чтобы Amvera использовала именно backend Dockerfile,
-# где устанавливаются зависимости включая PyJWT.
+    version: latest
 build:
-  dockerfile: backend/Dockerfile
-
-# Этот блок создаётся, чтобы маршрутизация Amvera шла на API-порт backend.
+  dockerfile: frontend/Dockerfile
+  skip: false
 run:
-  containerPort: 3000
+  persistenceMount: /data
+  image: null
+  command: null
+  args: null
+  containerPort: 80
+  servicePort: 80
