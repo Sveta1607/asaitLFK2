@@ -5,7 +5,10 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Этот блок создаётся, чтобы установить зависимости frontend-приложения.
-COPY package*.json ./
+# Этот блок создаётся, чтобы собирать именно frontend из подпапки.
+# Это защищает от ситуации, когда build-контекст на Amvera не корень frontend,
+# а корень репозитория (там могут лежать "лишние" package.json/src после merge).
+COPY frontend/package*.json ./
 RUN npm ci
 
 # Этот блок создаётся, чтобы передать адрес API в сборку фронтенда через env.
@@ -17,14 +20,16 @@ ARG VITE_CLERK_PUBLISHABLE_KEY=pk_test_aHVtb3JvdXMtbW9sbHktNTUuY2xlcmsuYWNjb3Vud
 ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
 
 # Этот блок создаётся, чтобы собрать production-версию фронтенда.
-COPY . .
+# Этот блок создаётся, чтобы положить в образ исходники именно frontend-проекта.
+COPY frontend/ ./
 RUN npm run build
 
 # Этот этап создаётся, чтобы обслуживать только статику фронтенда через Nginx.
 FROM nginx:1.27-alpine
 
 # Этот блок создаётся, чтобы включить SPA-роутинг и проксировать статику корректно.
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Этот блок создаётся, чтобы использовать nginx.conf из frontend-папки.
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Этот блок создаётся, чтобы скопировать итоговую статику из этапа сборки.
 COPY --from=build /app/dist /usr/share/nginx/html
