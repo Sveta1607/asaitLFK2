@@ -21,16 +21,25 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Блок: настройка CORS для dev-среды.
-# Нужен, чтобы фронтенд на Vite с любого localhost:порт мог обращаться к API.
-# В разработке можно безопасно разрешить все источники без учёта cookies.
-origins = ["*"]
+# Блок: настройка CORS для фронтенда и dev-среды.
+# Нужен, чтобы браузер разрешал запросы с фронтенда Amvera и localhost.
+# Явные origins помогают избежать 405 на preflight OPTIONS за прокси Amvera.
+_default_origins = [
+    "https://front-svetlanagolovchanskaya.amvera.io",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+]
+_cors_env = os.getenv("CORS_ORIGINS", "").strip()
+origins = _default_origins + [x.strip() for x in _cors_env.split(",") if x.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=False,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Блок: подключение роутеров под префиксом /api.
