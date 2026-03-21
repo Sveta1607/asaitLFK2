@@ -1,5 +1,5 @@
 // App.tsx — корневой компонент приложения: навигация, страницы и базовая логика
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { SignIn, SignOutButton, SignUp } from '@clerk/clerk-react';
 import {
@@ -1374,6 +1374,8 @@ const SpecialistNewsPage: React.FC<{
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Ref на форму новостей — для автопрокрутки при клике «Редактировать».
+  const formRef = useRef<HTMLElement>(null);
   // Этот блок создаётся, чтобы редактировать все текстовые блоки главной страницы.
   const [homeForm, setHomeForm] = useState<HomeContent>(homeContent);
   const [homeLoading, setHomeLoading] = useState(false);
@@ -1448,7 +1450,7 @@ const SpecialistNewsPage: React.FC<{
       )}
 
       {/* Форма добавления/редактирования новости */}
-      <section className="card mb-5">
+      <section ref={formRef} className="card mb-5">
         <div className="mb-4 flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-coral-100 text-xl">📝</span>
           <h1 className="text-lg font-bold text-gray-800">Управление новостями</h1>
@@ -1653,6 +1655,8 @@ const SpecialistNewsPage: React.FC<{
                     setTitle(item.title);
                     setExcerpt(item.excerpt);
                     setImageUrl(item.imageUrl);
+                    // Прокрутка к форме, чтобы пользователь сразу видел заполненные поля.
+                    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }}
                   className="btn-secondary text-xs"
                 >
