@@ -1,6 +1,6 @@
 // App.tsx — корневой компонент приложения: навигация, страницы и базовая логика
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { SignIn, SignOutButton, SignUp } from '@clerk/clerk-react';
 import {
   apiCancelBooking,
@@ -183,10 +183,13 @@ const Header: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
   );
 };
 
-// Компонент карточки новости — мягкие тени, скруглённые углы, зелёный акцент
-const NewsCard: React.FC<{ item: NewsItem }> = ({ item }) => {
+// Компонент карточки новости — предпросмотр с обрезкой текста, клик открывает полную новость
+const NewsCard: React.FC<{ item: NewsItem; onClick?: () => void }> = ({ item, onClick }) => {
   return (
-    <article className="card group flex flex-col overflow-hidden !p-0">
+    <article
+      className="card group flex cursor-pointer flex-col overflow-hidden !p-0 transition-shadow hover:shadow-lg"
+      onClick={onClick}
+    >
       {/* Изображение новости с плавным зумом при наведении */}
       <div className="h-44 w-full overflow-hidden">
         <img
@@ -195,10 +198,10 @@ const NewsCard: React.FC<{ item: NewsItem }> = ({ item }) => {
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
       </div>
-      {/* Текстовая часть */}
+      {/* Текстовая часть с обрезкой: заголовок — 3 строки, описание — 5 строк */}
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="text-sm font-bold text-gray-800">{item.title}</h3>
-        <p className="text-xs leading-relaxed text-gray-500">{item.excerpt}</p>
+        <h3 className="line-clamp-3 text-sm font-bold text-gray-800">{item.title}</h3>
+        <p className="line-clamp-5 text-xs leading-relaxed text-gray-500">{item.excerpt}</p>
         <div className="mt-auto flex items-center justify-between border-t border-gray-50 pt-3 text-[11px] text-gray-400">
           <span>{new Date(item.date).toLocaleDateString('ru-RU')}</span>
           {item.source && (
@@ -209,6 +212,55 @@ const NewsCard: React.FC<{ item: NewsItem }> = ({ item }) => {
         </div>
       </div>
     </article>
+  );
+};
+
+// Страница полной новости — открывается при клике на карточку
+const NewsDetailPage: React.FC<{ news: NewsItem[] }> = ({ news }) => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const item = news.find((n) => n.id === id);
+
+  if (!item) {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <div className="card text-center">
+          <span className="mb-3 inline-block text-4xl">📭</span>
+          <h1 className="mb-2 text-lg font-bold text-gray-800">Новость не найдена</h1>
+          <button onClick={() => navigate('/')} className="btn-primary mt-4">На главную</button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-3xl px-4 py-8">
+      <button
+        onClick={() => navigate(-1)}
+        className="mb-4 flex items-center gap-1 text-sm font-semibold text-mint-600 transition-colors hover:text-mint-700"
+      >
+        ← Назад
+      </button>
+      <article className="card overflow-hidden !p-0">
+        <img
+          src={item.imageUrl}
+          alt={item.title}
+          className="h-64 w-full object-cover md:h-80"
+        />
+        <div className="p-6">
+          <div className="mb-3 flex items-center gap-3 text-xs text-gray-400">
+            <span>{new Date(item.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            {item.source && (
+              <span className="rounded-full bg-mint-50 px-2 py-0.5 text-mint-600">
+                {item.source === 'manual' ? 'Вручную' : 'Авто'}
+              </span>
+            )}
+          </div>
+          <h1 className="mb-4 text-xl font-extrabold text-gray-800">{item.title}</h1>
+          <p className="whitespace-pre-line text-sm leading-relaxed text-gray-600">{item.excerpt}</p>
+        </div>
+      </article>
+    </main>
   );
 };
 
@@ -313,6 +365,21 @@ const HomePage: React.FC<{
         </div>
       </section>
 
+      {/* Блок «О специалисте» */}
+      <section className="card mb-10 border-mint-100 bg-gradient-to-r from-mint-50 to-white">
+        <div className="flex items-start gap-4">
+            <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-mint-100 text-2xl">
+            {homeContent.specialistIcon}
+          </span>
+          <div>
+            <h3 className="mb-2 text-base font-bold text-gray-800">{homeContent.specialistTitle}</h3>
+            <p className="text-sm leading-relaxed text-gray-600">
+              {homeContent.specialistText}
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Блок новостей */}
       <section className="mb-10">
         <div className="mb-4 flex items-center justify-between">
@@ -337,25 +404,10 @@ const HomePage: React.FC<{
         {!newsLoading && !newsError && (
           <div className="grid gap-5 md:grid-cols-3">
             {news.map((item) => (
-              <NewsCard key={item.id} item={item} />
+              <NewsCard key={item.id} item={item} onClick={() => navigate(`/news/${item.id}`)} />
             ))}
           </div>
         )}
-      </section>
-
-      {/* Блок «О специалисте» */}
-      <section className="card border-mint-100 bg-gradient-to-r from-mint-50 to-white">
-        <div className="flex items-start gap-4">
-            <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-mint-100 text-2xl">
-            {homeContent.specialistIcon}
-          </span>
-          <div>
-            <h3 className="mb-2 text-base font-bold text-gray-800">{homeContent.specialistTitle}</h3>
-            <p className="text-sm leading-relaxed text-gray-600">
-              {homeContent.specialistText}
-            </p>
-          </div>
-        </div>
       </section>
     </main>
   );
@@ -1960,6 +2012,10 @@ const App: React.FC = () => {
               newsError={errorNews}
             />
           }
+        />
+        <Route
+          path="/news/:id"
+          element={<NewsDetailPage news={news} />}
         />
         <Route
           path="/login/*"
