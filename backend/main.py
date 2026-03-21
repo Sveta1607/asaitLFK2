@@ -26,6 +26,7 @@ app = FastAPI(
 # Явные origins помогают избежать 405 на preflight OPTIONS за прокси Amvera.
 _default_origins = [
     "https://front-svetlanagolovchanskaya.amvera.io",
+    "http://front-svetlanagolovchanskaya.amvera.io",
     "http://localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
