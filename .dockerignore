@@ -1,8 +1,6 @@
-# .dockerignore в корне — используется при сборке backend на Amvera.
-# Контекст сборки = корень репо, этот файл исключает лишнее и ускоряет сборку.
-
-# Фронтенд — для backend не нужен, экономит ~400+ MB контекста.
-frontend/
+# .dockerignore в корне — используется при сборке backend И frontend на Amvera.
+# ВАЖНО: frontend/ НЕ исключаем — проект front использует Dockerfile.frontend с COPY frontend/.
+# Исключение frontend/ приводило к тому, что на Amvera собирался старый/пустой дизайн.
 
 # Git и служебные папки.
 .git/

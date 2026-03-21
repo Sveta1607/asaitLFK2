@@ -1,0 +1,26 @@
+# Этот Dockerfile создан для сборки фронтенда при контексте = корень репо (Amvera).
+# Локально используется frontend/Dockerfile с context: ./frontend.
+FROM node:22-alpine AS build
+
+WORKDIR /app
+
+# Копируем package.json из frontend (контекст = корень репо).
+COPY frontend/package*.json ./
+RUN npm ci
+
+ARG VITE_API_URL=https://lfk-b-svetlanagolovchanskaya.amvera.io/api
+ENV VITE_API_URL=${VITE_API_URL}
+
+ARG VITE_CLERK_PUBLISHABLE_KEY=pk_test_aHVtb3JvdXMtbW9sbHktNTUuY2xlcmsuYWNjb3VudHMuZGV2JA
+ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
+
+# Копируем весь frontend (контекст = корень репо).
+COPY frontend/ .
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80

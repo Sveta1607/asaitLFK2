@@ -4,8 +4,9 @@ meta:
   toolchain:
     name: docker
     version: latest
+# Используем Dockerfile.frontend — он копирует frontend/ при контексте = корень (обход .dockerignore).
 build:
-  dockerfile: frontend/Dockerfile
+  dockerfile: Dockerfile.frontend
   skip: false
 run:
   persistenceMount: /data
