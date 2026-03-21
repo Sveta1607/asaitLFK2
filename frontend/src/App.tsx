@@ -560,11 +560,26 @@ const BookingPage: React.FC<{
 }> = ({ currentUser, slots, slotsLoading, slotsError, onCreateBooking }) => {
   const navigate = useNavigate();
 
-  // Уникальные даты с доступными слотами
+  // Фильтрация: не показываем прошедшие даты и слоты с прошедшим временем
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const futureSlots = useMemo(() => {
+    return slots.filter((s) => {
+      if (s.date < todayStr) return false;
+      if (s.date === todayStr) {
+        const [h, m] = s.time.split(':').map(Number);
+        if (h * 60 + m <= currentMinutes) return false;
+      }
+      return true;
+    });
+  }, [slots, todayStr, currentMinutes]);
+
   const availableDates = useMemo(() => {
-    const dates = new Set(slots.map((s) => s.date));
+    const dates = new Set(futureSlots.map((s) => s.date));
     return Array.from(dates).sort();
-  }, [slots]);
+  }, [futureSlots]);
 
   const firstDate = availableDates[0] ?? '';
 
@@ -603,10 +618,10 @@ const BookingPage: React.FC<{
     );
   }
 
-  // Слоты на выбранную дату
+  // Слоты на выбранную дату (только будущие)
   const dateSlots = useMemo(
-    () => slots.filter((s) => s.date === selectedDate),
-    [slots, selectedDate]
+    () => futureSlots.filter((s) => s.date === selectedDate),
+    [futureSlots, selectedDate]
   );
 
   const selectedSlot = dateSlots.find((s) => s.time === selectedTime);
@@ -640,7 +655,16 @@ const BookingPage: React.FC<{
       <section className="card mb-5">
         <div className="mb-4 flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-100 text-xl">📅</span>
-          <h1 className="text-lg font-bold text-gray-800">Запись на приём</h1>
+          <div>
+            <h1 className="text-lg font-bold text-gray-800">Запись на приём</h1>
+            {dateSlots.length > 0 && dateSlots[0].specialistLastName && (
+              <p className="text-sm text-gray-500">
+                Специалист: <span className="font-semibold text-gray-700">
+                  {dateSlots[0].specialistLastName} {dateSlots[0].specialistFirstName}
+                </span>
+              </p>
+            )}
+          </div>
         </div>
 
         {slotsLoading && (

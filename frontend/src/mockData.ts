@@ -14,13 +14,15 @@ export type User = {
   phone?: string;
 };
 
-// Тип слота времени для записи
+// Тип слота времени для записи (включает ФИО специалиста)
 export type TimeSlot = {
   id: string;
   specialistId: string;
   date: string;
   time: string;
   status: 'free' | 'busy';
+  specialistFirstName?: string | null;
+  specialistLastName?: string | null;
 };
 
 // Тип записи к специалисту

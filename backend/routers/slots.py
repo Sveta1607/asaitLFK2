@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from auth_deps import RequireUser, RequireSpecialist
 from db import get_db
-from db_models import Slot
+from db_models import Slot, User
 from models import SlotCreateRequest, SlotBatchCreateRequest, SlotResponse
 
 router = APIRouter(prefix="/slots", tags=["slots"])
@@ -34,13 +34,15 @@ def list_slots(
     - позволить пациентам видеть расписание нескольких специалистов без дополнительных ручек;
     - опираться на JWT Clerk (RequireUser), а не на заголовок X-User-Id.
     """
-    stmt = select(Slot)
+    stmt = select(Slot, User.first_name, User.last_name).join(
+        User, Slot.specialist_id == User.id
+    )
     if specialistId:
         stmt = stmt.where(Slot.specialist_id == specialistId)
     if date:
         stmt = stmt.where(Slot.date == date)
     stmt = stmt.order_by(Slot.date, Slot.time)
-    rows = db.execute(stmt).scalars().all()
+    rows = db.execute(stmt).all()
     return [
         SlotResponse(
             id=s.id,
@@ -48,8 +50,10 @@ def list_slots(
             date=s.date,
             time=s.time,
             status=s.status,
+            specialistFirstName=fn,
+            specialistLastName=ln,
         )
-        for s in rows
+        for s, fn, ln in rows
     ]
 
 

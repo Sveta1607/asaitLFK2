@@ -148,12 +148,14 @@ class SlotBatchCreateRequest(BaseModel):
 
 
 class SlotResponse(BaseModel):
-    """Ответ со слотом"""
+    """Ответ со слотом — включает ФИО специалиста для отображения пациенту."""
     id: str
     specialistId: str
     date: str
     time: str
     status: Literal["free", "busy"]
+    specialistFirstName: Optional[str] = None
+    specialistLastName: Optional[str] = None
 
 
 # --- Bookings ---
