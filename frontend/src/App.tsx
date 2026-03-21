@@ -16,6 +16,7 @@ import {
   apiAddNews,
   apiUpdateHomeContent,
   apiUpdateNews,
+  apiDeleteNews,
   apiUpdateUser,
 } from './api';
 import { useClerkAuth, RoleSelectForm } from './ClerkAuth';
@@ -1366,8 +1367,9 @@ const SpecialistNewsPage: React.FC<{
   newsError?: string | null;
   onAddNews: (payload: { title: string; excerpt: string; imageUrl: string }) => Promise<void>;
   onUpdateNews: (payload: { id: string; title: string; excerpt: string; imageUrl: string }) => Promise<void>;
+  onDeleteNews: (newsId: string) => Promise<void>;
   onUpdateHomeContent: (payload: HomeContent) => Promise<void>;
-}> = ({ currentUser, news, homeContent, newsLoading, newsError, onAddNews, onUpdateNews, onUpdateHomeContent }) => {
+}> = ({ currentUser, news, homeContent, newsLoading, newsError, onAddNews, onUpdateNews, onDeleteNews, onUpdateHomeContent }) => {
   const [title, setTitle] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -1648,20 +1650,35 @@ const SpecialistNewsPage: React.FC<{
             {news.map((item) => (
               <div key={item.id} className="flex flex-col gap-2">
                 <NewsCard item={item} />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingId(item.id);
-                    setTitle(item.title);
-                    setExcerpt(item.excerpt);
-                    setImageUrl(item.imageUrl);
-                    // Прокрутка к форме, чтобы пользователь сразу видел заполненные поля.
-                    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}
-                  className="btn-secondary text-xs"
-                >
-                  Редактировать
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingId(item.id);
+                      setTitle(item.title);
+                      setExcerpt(item.excerpt);
+                      setImageUrl(item.imageUrl);
+                      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
+                    className="btn-secondary flex-1 text-xs"
+                  >
+                    Редактировать
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!window.confirm('Удалить эту новость?')) return;
+                      try {
+                        await onDeleteNews(item.id);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : 'Ошибка при удалении');
+                      }
+                    }}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
+                  >
+                    Удалить
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -1833,6 +1850,14 @@ const App: React.FC = () => {
     if (!token) return;
     const updated = await apiUpdateNews(token, payload.id, payload);
     setNews((prev) => prev.map((n) => (n.id === payload.id ? updated : n)));
+  }, [currentUser, getToken]);
+
+  const handleDeleteNews = useCallback(async (newsId: string) => {
+    if (!currentUser) return;
+    const token = await getToken();
+    if (!token) return;
+    await apiDeleteNews(token, newsId);
+    setNews((prev) => prev.filter((n) => n.id !== newsId));
   }, [currentUser, getToken]);
 
   const handleUpdateHomeContent = useCallback(async (payload: HomeContent) => {
@@ -2052,6 +2077,7 @@ const App: React.FC = () => {
               newsError={errorNews}
               onAddNews={handleAddNews}
               onUpdateNews={handleUpdateNews}
+              onDeleteNews={handleDeleteNews}
               onUpdateHomeContent={handleUpdateHomeContent}
             />
           }

@@ -130,6 +130,15 @@ export async function apiUpdateNews(
   return res.json();
 }
 
+// Удаление новости — только специалист (JWT Clerk).
+export async function apiDeleteNews(token: string, newsId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/news/${newsId}`, {
+    method: 'DELETE',
+    headers: headers(token),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+}
+
 // --- Site content (главная страница) ---
 export async function apiGetHomeContent(): Promise<HomeContent> {
   // Этот блок создаётся, чтобы публично загружать редактируемый контент главной страницы.
