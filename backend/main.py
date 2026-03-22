@@ -1,12 +1,32 @@
-# main.py — точка входа FastAPI, CORS, подключение роутеров
+# main.py — точка входа FastAPI, CORS, подключение роутеров, Sentry, логирование
 import os
+import time
+
+import sentry_sdk
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 # Блок: загрузка переменных окружения.
 # Нужен, чтобы прочитать PORT, HOST, DATABASE_URL и дополнительные CORS_ORIGINS из .env.
 load_dotenv()
+
+# Инициализация Sentry — отправляет ошибки и трассировки в Sentry Dashboard.
+# DSN берётся из .env; если пустой, SDK не инициализируется (безопасно для локальной разработки).
+_sentry_dsn = os.getenv("SENTRY_DSN", "")
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        # traces_sample_rate=1.0 — 100% трассировок (подходит при малой нагрузке)
+        traces_sample_rate=1.0,
+        # send_default_pii=True позволяет отправлять IP и заголовки для контекста ошибок
+        send_default_pii=True,
+        environment=os.getenv("SENTRY_ENV", "production"),
+    )
+
+# Настройка структурированного логирования (JSON-формат для удобного парсинга в облаке)
+from logger import setup_logging  # noqa: E402
+logger = setup_logging()
 
 # ВАЖНО: db/engine читают DATABASE_URL при импорте.
 # Этот импорт создаётся ПОСЛЕ load_dotenv(), чтобы DATABASE_URL из backend/.env успел примениться,
@@ -42,6 +62,32 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+# Middleware для логирования каждого HTTP-запроса: метод, путь, статус, время ответа.
+# Позволяет отслеживать производительность и выявлять медленные эндпоинты.
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration_ms = round((time.time() - start) * 1000, 2)
+
+    log_data = {
+        "method": request.method,
+        "path": request.url.path,
+        "status": response.status_code,
+        "duration_ms": duration_ms,
+        "client_ip": request.client.host if request.client else "unknown",
+    }
+
+    if response.status_code >= 500:
+        logger.error("HTTP request failed", extra=log_data)
+    elif response.status_code >= 400:
+        logger.warning("HTTP client error", extra=log_data)
+    else:
+        logger.info("HTTP request", extra=log_data)
+
+    return response
+
 
 # Блок: подключение роутеров под префиксом /api.
 # Нужен, чтобы сгруппировать все эндпоинты и сохранить существующий контракт с фронтендом.

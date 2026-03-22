@@ -1,4 +1,5 @@
-# routers/users.py — эндпоинты профиля пользователя
+# routers/users.py — эндпоинты профиля пользователя.
+# Также логирует бизнес-события: регистрация, синхронизация, смена роли.
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, status
@@ -10,8 +11,10 @@ from auth_deps import RequireSuperuser, RequireUser, get_clerk_payload
 from db import get_db
 from db_models import User
 from models import UserUpdateRequest, UserResponse
+from logger import get_logger
 
 router = APIRouter(prefix="/users", tags=["users"])
+log = get_logger()
 
 
 class ClerkSyncRequest(BaseModel):
@@ -149,6 +152,12 @@ def sync_from_clerk(
             approved=True,
         )
         db.add(user)
+        log.info("user_registered", extra={
+            "event": "user_registered",
+            "user_id": new_id,
+            "role": body.role,
+            "email": body.email,
+        })
     else:
         # Этот блок создаётся, чтобы:
         # - обновлять email и username, если пользователь уже существует;
@@ -156,6 +165,11 @@ def sync_from_clerk(
         user.email = body.email.strip()
         user.username = body.username
         db.add(user)
+        log.info("user_synced", extra={
+            "event": "user_synced",
+            "user_id": user.id,
+            "email": body.email,
+        })
 
     db.commit()
     db.refresh(user)
@@ -226,10 +240,18 @@ def change_user_role(
             status_code=404,
             detail={"detail": "Пользователь не найден.", "code": "USER_NOT_FOUND"},
         )
+    old_role = user.role
     user.role = body.role
     db.add(user)
     db.commit()
     db.refresh(user)
+    log.info("user_role_changed", extra={
+        "event": "user_role_changed",
+        "user_id": user.id,
+        "old_role": old_role,
+        "new_role": body.role,
+        "changed_by": admin.id,
+    })
     return UserResponse(
         id=user.id,
         role=user.role,

@@ -1,15 +1,36 @@
 // main.tsx — точка входа React-приложения
 // Этот блок создаётся, чтобы:
 // - подключить Clerk для аутентификации (вход, регистрация, восстановление пароля);
-// - обернуть приложение в ClerkProvider с publishableKey из .env.
+// - обернуть приложение в ClerkProvider с publishableKey из .env;
+// - инициализировать Sentry для автоматического отслеживания ошибок в продакшене.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, useNavigate } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/clerk-react';
 import { ruRU } from '@clerk/localizations';
+import * as Sentry from '@sentry/react';
 import './index.css';
 import App from './App';
 import { ErrorBoundary } from './ErrorBoundary';
+
+// Инициализация Sentry — отправляет ошибки и перформанс-данные в Sentry Dashboard.
+// DSN берётся из .env; если не задан, Sentry просто не инициализируется (безопасно).
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN || '';
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: import.meta.env.MODE,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration(),
+    ],
+    // Процент трассировок производительности (1.0 = 100% — подходит для малой нагрузки)
+    tracesSampleRate: 1.0,
+    // Session Replay: 10% обычных сессий, 100% с ошибками
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0,
+  });
+}
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '';
 if (!publishableKey) {

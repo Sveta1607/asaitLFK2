@@ -1,4 +1,5 @@
-# routers/bookings.py — CRUD записей на приём
+# routers/bookings.py — CRUD записей на приём.
+# Также логирует бизнес-события: создание и отмена записей.
 import uuid
 from typing import Optional
 
@@ -9,8 +10,10 @@ from sqlalchemy.orm import Session
 from auth_deps import RequireUser, RequireSpecialist
 from db import get_db
 from db_models import Slot, Booking
+from logger import get_logger
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
+log = get_logger()
 
 
 def _generate_cancel_token() -> str:
@@ -164,6 +167,15 @@ def create_booking(
     db.add(slot)
     db.commit()
     db.refresh(booking)
+    log.info("booking_created", extra={
+        "event": "booking_created",
+        "booking_id": booking.id,
+        "specialist_id": booking.specialist_id,
+        "user_id": booking.user_id,
+        "date": booking.date,
+        "time": booking.time,
+        "created_by": "patient" if is_patient else "specialist",
+    })
     return {
         "id": booking.id,
         "specialistId": booking.specialist_id,
@@ -220,6 +232,12 @@ def cancel_booking(
     booking.status = "cancelled"
     db.add(booking)
     db.commit()
+    log.info("booking_cancelled", extra={
+        "event": "booking_cancelled",
+        "booking_id": booking.id,
+        "cancelled_by": user.id,
+        "role": user.role,
+    })
     return {"id": booking.id, "status": "cancelled"}
 
 
@@ -248,4 +266,8 @@ def cancel_by_token(token: str, db: Session = Depends(get_db)):
     booking.status = "cancelled"
     db.add(booking)
     db.commit()
+    log.info("booking_cancelled_by_token", extra={
+        "event": "booking_cancelled_by_token",
+        "booking_id": booking.id,
+    })
     return {"success": True, "booking": {"id": booking.id, "status": "cancelled"}}

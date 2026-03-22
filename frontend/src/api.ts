@@ -1,5 +1,7 @@
-// api.ts — клиент для запросов к бэкенду (fetch), базовый URL и заголовки
+// api.ts — клиент для запросов к бэкенду (fetch), базовый URL и заголовки.
+// Также отправляет HTTP-ошибки (4xx/5xx) в Sentry как breadcrumbs и события.
 import type { Booking, HomeContent, NewsItem, TimeSlot, User } from './mockData';
+import * as Sentry from '@sentry/react';
 
 // Базовый URL API из переменной окружения
 const API_BASE = import.meta.env.VITE_API_URL || 'https://lfk-b-svetlanagolovchanskaya.amvera.io/api';
@@ -18,16 +20,27 @@ function headers(token?: string): Record<string, string> {
 // Ошибка с сообщением от сервера (detail может быть строкой или объектом).
 // Этот вспомогательный блок создан, чтобы аккуратно разобрать detail и вернуть
 // человекочитаемое сообщение для отображения в интерфейсе без лишних побочных запросов.
+// Также отправляет серверные ошибки (5xx) в Sentry.
 async function parseError(res: Response): Promise<string> {
+  let message: string;
   try {
     const data = await res.json();
     const d = data.detail;
-    if (typeof d === 'string') return d;
-    if (d && typeof d === 'object' && typeof d.detail === 'string') return d.detail;
-    return `Ошибка ${res.status}`;
+    if (typeof d === 'string') message = d;
+    else if (d && typeof d === 'object' && typeof d.detail === 'string') message = d.detail;
+    else message = `Ошибка ${res.status}`;
   } catch {
-    return `Ошибка ${res.status}`;
+    message = `Ошибка ${res.status}`;
   }
+
+  // Серверные ошибки (5xx) отправляются в Sentry как полноценные события
+  if (res.status >= 500) {
+    Sentry.captureException(new Error(`API ${res.status}: ${message}`), {
+      extra: { url: res.url, status: res.status },
+    });
+  }
+
+  return message;
 }
 
 // --- Auth (Clerk) ---
