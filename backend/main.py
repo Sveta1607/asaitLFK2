@@ -120,7 +120,3 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/api/test-sentry")
-def test_sentry():
-    """Тестовый эндпоинт для проверки Sentry/GlitchTip. Удалить после проверки."""
-    raise ValueError("Тестовая ошибка для проверки GlitchTip!")
