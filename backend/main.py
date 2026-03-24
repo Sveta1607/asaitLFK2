@@ -8,8 +8,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 # Блок: загрузка переменных окружения.
-# Нужен, чтобы прочитать PORT, HOST, DATABASE_URL и дополнительные CORS_ORIGINS из .env.
-load_dotenv()
+# override=False — переменные из Amvera UI имеют приоритет перед локальным .env-файлом.
+load_dotenv(override=False)
 
 # Инициализация Sentry — отправляет ошибки и трассировки в Sentry Dashboard.
 # DSN берётся из .env; если пустой, SDK не инициализируется (безопасно для локальной разработки).

@@ -437,7 +437,8 @@ const ProfilePage: React.FC<{
   const [email, setEmail] = useState(currentUser.email);
   const [firstName, setFirstName] = useState(currentUser.firstName ?? '');
   const [lastName, setLastName] = useState(currentUser.lastName ?? '');
-  const [phone, setPhone] = useState(currentUser.phone ?? '');
+  // Телефон инициализируется из профиля или с +7 по умолчанию
+  const [phone, setPhone] = useState(currentUser.phone || '+7');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -498,13 +499,19 @@ const ProfilePage: React.FC<{
                 onChange={(e) => setLastName(e.target.value)}
               />
             </div>
+            {/* Телефон — +7 зафиксирован, пользователь вводит только 10 цифр после кода */}
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-gray-600">Телефон</label>
               <input
                 type="tel"
                 className="input-field"
+                placeholder="+79511232314"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                maxLength={12}
+                onChange={(e) => {
+                  const d = e.target.value.replace(/\D/g, '');
+                  setPhone('+7' + (d.startsWith('7') ? d.slice(1) : d).slice(0, 10));
+                }}
               />
             </div>
             <div>
@@ -653,7 +660,8 @@ const BookingPage: React.FC<{
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [firstName, setFirstName] = useState(currentUser?.firstName ?? '');
   const [lastName, setLastName] = useState(currentUser?.lastName ?? '');
-  const [phone, setPhone] = useState(currentUser?.phone ?? '');
+  // Телефон инициализируется из профиля или с +7 по умолчанию
+  const [phone, setPhone] = useState(currentUser?.phone || '+7');
   const [over18, setOver18] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -915,13 +923,19 @@ const BookingPage: React.FC<{
                 </div>
               </div>
 
+              {/* Телефон — +7 зафиксирован, пользователь вводит только 10 цифр после кода */}
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-600">Телефон</label>
                 <input
                   type="tel"
                   className="input-field"
+                  placeholder="+79511232314"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  maxLength={12}
+                  onChange={(e) => {
+                    const d = e.target.value.replace(/\D/g, '');
+                    setPhone('+7' + (d.startsWith('7') ? d.slice(1) : d).slice(0, 10));
+                  }}
                 />
               </div>
 
@@ -1105,6 +1119,18 @@ const MyBookingsPage: React.FC<{
   );
 };
 
+// Генерация вариантов времени для select-списков (24-часовой формат, шаг 30 мин)
+const TIME_OPTIONS: string[] = (() => {
+  const opts: string[] = [];
+  for (let h = 8; h <= 20; h++) {
+    for (const m of [0, 30]) {
+      if (h === 20 && m === 30) break;
+      opts.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }
+  return opts;
+})();
+
 // Страница расписания специалиста
 const SpecialistSchedulePage: React.FC<{
   currentUser: User | null;
@@ -1156,10 +1182,11 @@ const SpecialistSchedulePage: React.FC<{
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
+  // Телефон начинается с +7 по умолчанию
+  const [phone, setPhone] = useState('+7');
   const [newSlotTime, setNewSlotTime] = useState('');
-  const [batchStartTime, setBatchStartTime] = useState('');
-  const [batchEndTime, setBatchEndTime] = useState('');
+  const [batchStartTime, setBatchStartTime] = useState('09:00');
+  const [batchEndTime, setBatchEndTime] = useState('17:00');
   const [batchStepMin, setBatchStepMin] = useState(30);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -1224,7 +1251,7 @@ const SpecialistSchedulePage: React.FC<{
       });
       setFirstName('');
       setLastName('');
-      setPhone('');
+      setPhone('+7');
       setSelectedTime(null);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Ошибка при создании записи');
@@ -1235,7 +1262,10 @@ const SpecialistSchedulePage: React.FC<{
 
   const handleCreateSlot = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSlotTime) return;
+    if (!newSlotTime) {
+      setActionError('Выберите время для добавления слота.');
+      return;
+    }
     setActionError(null);
     setActionLoading(true);
     try {
@@ -1250,7 +1280,10 @@ const SpecialistSchedulePage: React.FC<{
 
   const handleCreateSlotsBatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!batchStartTime || !batchEndTime) return;
+    if (!batchStartTime || !batchEndTime) {
+      setActionError('Укажите начало и конец диапазона времени.');
+      return;
+    }
     const toMinutes = (t: string) => {
       const [h, m] = t.split(':').map(Number);
       return h * 60 + (m || 0);
@@ -1262,24 +1295,27 @@ const SpecialistSchedulePage: React.FC<{
     };
     const start = toMinutes(batchStartTime);
     const end = toMinutes(batchEndTime);
-    if (start >= end) return;
+    if (start >= end) {
+      setActionError('Время начала должно быть раньше времени окончания.');
+      return;
+    }
     const step = Math.max(1, batchStepMin);
     const times: string[] = [];
     for (let m = start; m < end; m += step) {
       times.push(fromMinutes(m));
     }
-    if (times.length > 0) {
-      setActionError(null);
-      setActionLoading(true);
-      try {
-        await onCreateSlotsBatch({ date: selectedDate, times });
-        setBatchStartTime('');
-        setBatchEndTime('');
-      } catch (err) {
-        setActionError(err instanceof Error ? err.message : 'Ошибка при добавлении слотов');
-      } finally {
-        setActionLoading(false);
-      }
+    if (times.length === 0) {
+      setActionError('Не удалось сформировать слоты. Проверьте параметры.');
+      return;
+    }
+    setActionError(null);
+    setActionLoading(true);
+    try {
+      await onCreateSlotsBatch({ date: selectedDate, times });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Ошибка при добавлении слотов');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -1383,25 +1419,29 @@ const SpecialistSchedulePage: React.FC<{
           />
         </div>
 
-        {/* Добавление одного слота */}
+        {/* Добавление одного слота — select с 24-часовым форматом */}
         <form onSubmit={handleCreateSlot} className="mb-4 space-y-3">
           <label className="mb-1.5 block text-xs font-semibold text-gray-600">
             Добавить один час приёма
           </label>
           <div className="flex gap-2">
-            <input
-              type="time"
+            <select
               className="input-field flex-1"
               value={newSlotTime}
               onChange={(e) => setNewSlotTime(e.target.value)}
-            />
+            >
+              <option value="">— выберите время —</option>
+              {TIME_OPTIONS.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
             <button type="submit" disabled={!newSlotTime || actionLoading} className="btn-primary">
               Добавить слот
             </button>
           </div>
         </form>
 
-        {/* Добавление нескольких слотов (диапазон) */}
+        {/* Добавление нескольких слотов (диапазон) — select с 24-часовым форматом */}
         <form onSubmit={handleCreateSlotsBatch} className="rounded-2xl border border-mint-100 bg-mint-50/30 p-4">
           <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-gray-500">
             Добавить несколько часов подряд
@@ -1409,21 +1449,27 @@ const SpecialistSchedulePage: React.FC<{
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-[100px]">
               <label className="mb-1.5 block text-xs font-semibold text-gray-600">С</label>
-              <input
-                type="time"
+              <select
                 className="input-field"
                 value={batchStartTime}
                 onChange={(e) => setBatchStartTime(e.target.value)}
-              />
+              >
+                {TIME_OPTIONS.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
             <div className="min-w-[100px]">
               <label className="mb-1.5 block text-xs font-semibold text-gray-600">До</label>
-              <input
-                type="time"
+              <select
                 className="input-field"
                 value={batchEndTime}
                 onChange={(e) => setBatchEndTime(e.target.value)}
-              />
+              >
+                {TIME_OPTIONS.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
             <div className="min-w-[80px]">
               <label className="mb-1.5 block text-xs font-semibold text-gray-600">Шаг (мин)</label>
@@ -1555,13 +1601,19 @@ const SpecialistSchedulePage: React.FC<{
             </div>
           </div>
 
+          {/* Телефон — +7 зафиксирован, пользователь вводит только 10 цифр после кода */}
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-gray-600">Телефон</label>
             <input
               type="tel"
               className="input-field"
+              placeholder="+79511232314"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              maxLength={12}
+              onChange={(e) => {
+                const d = e.target.value.replace(/\D/g, '');
+                setPhone('+7' + (d.startsWith('7') ? d.slice(1) : d).slice(0, 10));
+              }}
             />
           </div>
 

@@ -39,6 +39,9 @@ DATABASE_URL = os.getenv(
 if DATABASE_URL.startswith("postgresql+psycopg2://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
 
+_db_type = "PostgreSQL" if DATABASE_URL.startswith("postgresql") else "SQLite"
+print(f"DB: подключение к {_db_type} ({DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL})")
+
 engine = create_engine(DATABASE_URL, echo=False, future=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
 

@@ -25,7 +25,8 @@ function RoleSelectForm({
   const [username, setUsername] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
+  // Телефон начинается с +7 по умолчанию, чтобы пользователь вводил только оставшиеся 10 цифр
+  const [phone, setPhone] = useState('+7');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -139,15 +140,19 @@ function RoleSelectForm({
           </div>
         </div>
 
-        {/* Телефон — сохраняется в профиль при регистрации */}
+        {/* Телефон — +7 зафиксирован, пользователь вводит только 10 цифр после кода страны */}
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-gray-600">Телефон</label>
           <input
             type="tel"
             className="input-field"
-            placeholder="+7 (999) 123-45-67"
+            placeholder="+79511232314"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            maxLength={12}
+            onChange={(e) => {
+              const d = e.target.value.replace(/\D/g, '');
+              setPhone('+7' + (d.startsWith('7') ? d.slice(1) : d).slice(0, 10));
+            }}
           />
         </div>
 

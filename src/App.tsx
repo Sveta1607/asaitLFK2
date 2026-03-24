@@ -311,7 +311,8 @@ const ProfilePage: React.FC<{
   const [email, setEmail] = useState(currentUser.email);
   const [firstName, setFirstName] = useState(currentUser.firstName ?? '');
   const [lastName, setLastName] = useState(currentUser.lastName ?? '');
-  const [phone, setPhone] = useState(currentUser.phone ?? '');
+  // Телефон инициализируется из профиля или с +7 по умолчанию
+  const [phone, setPhone] = useState(currentUser.phone || '+7');
   // Локальное состояние для текстовой ошибки (если e-mail не заполнен)
   const [error, setError] = useState<string | null>(null);
 
@@ -372,13 +373,19 @@ const ProfilePage: React.FC<{
                 onChange={(e) => setLastName(e.target.value)}
               />
             </div>
+            {/* Телефон — +7 зафиксирован, пользователь вводит только 10 цифр после кода */}
             <div>
               <label className="mb-1 block text-xs text-slate-600">Телефон</label>
               <input
                 type="tel"
                 className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+                placeholder="+79511232314"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                maxLength={12}
+                onChange={(e) => {
+                  const d = e.target.value.replace(/\D/g, '');
+                  setPhone('+7' + (d.startsWith('7') ? d.slice(1) : d).slice(0, 10));
+                }}
               />
             </div>
             <div>
@@ -455,7 +462,8 @@ const BookingPage: React.FC<{
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [firstName, setFirstName] = useState(currentUser?.firstName ?? '');
   const [lastName, setLastName] = useState(currentUser?.lastName ?? '');
-  const [phone, setPhone] = useState(currentUser?.phone ?? '');
+  // Телефон инициализируется из профиля или с +7 по умолчанию
+  const [phone, setPhone] = useState(currentUser?.phone || '+7');
   const [over18, setOver18] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -636,13 +644,19 @@ const BookingPage: React.FC<{
             </div>
           </div>
 
+          {/* Телефон — +7 зафиксирован, пользователь вводит только 10 цифр после кода */}
           <div>
             <label className="mb-1 block text-xs text-slate-600">Телефон</label>
             <input
               type="tel"
               className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+              placeholder="+79511232314"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              maxLength={12}
+              onChange={(e) => {
+                const d = e.target.value.replace(/\D/g, '');
+                setPhone('+7' + (d.startsWith('7') ? d.slice(1) : d).slice(0, 10));
+              }}
             />
           </div>
 
@@ -886,7 +900,8 @@ const SpecialistSchedulePage: React.FC<{
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
+  // Телефон начинается с +7 по умолчанию
+  const [phone, setPhone] = useState('+7');
   // Время одного нового слота
   const [newSlotTime, setNewSlotTime] = useState('');
   // Диапазон для добавления нескольких слотов (часы приёма)
@@ -958,7 +973,7 @@ const SpecialistSchedulePage: React.FC<{
       });
       setFirstName('');
       setLastName('');
-      setPhone('');
+      setPhone('+7');
       setSelectedTime(null);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Ошибка при создании записи');
@@ -1290,13 +1305,19 @@ const SpecialistSchedulePage: React.FC<{
             </div>
           </div>
 
+          {/* Телефон — +7 зафиксирован, пользователь вводит только 10 цифр после кода */}
           <div>
             <label className="mb-1 block text-xs text-slate-600">Телефон</label>
             <input
               type="tel"
               className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-sky-500"
+              placeholder="+79511232314"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              maxLength={12}
+              onChange={(e) => {
+                const d = e.target.value.replace(/\D/g, '');
+                setPhone('+7' + (d.startsWith('7') ? d.slice(1) : d).slice(0, 10));
+              }}
             />
           </div>
 
