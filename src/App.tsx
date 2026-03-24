@@ -468,6 +468,16 @@ const BookingPage: React.FC<{
     }
   }, [availableDates]);
 
+  // Блок: слоты на выбранную дату.
+  // Вынесен ПЕРЕД ранним return, чтобы не нарушать Rules of Hooks
+  // (количество вызовов хуков должно быть одинаковым при каждом рендере).
+  const dateSlots = useMemo(
+    () => slots.filter((s) => s.date === selectedDate),
+    [slots, selectedDate]
+  );
+
+  const selectedSlot = dateSlots.find((s) => s.time === selectedTime);
+
   // Если пользователь не авторизован как пациент — показываем подсказку
   if (!currentUser || currentUser.role !== 'user') {
     return (
@@ -490,17 +500,6 @@ const BookingPage: React.FC<{
       </main>
     );
   }
-
-  // Блок: слоты на выбранную дату.
-  // Нужен, чтобы:
-  // - показывать пациенту все времена приёма на эту дату независимо от специалиста;
-  // - брать specialistId непосредственно из выбранного слота при создании записи.
-  const dateSlots = useMemo(
-    () => slots.filter((s) => s.date === selectedDate),
-    [slots, selectedDate]
-  );
-
-  const selectedSlot = dateSlots.find((s) => s.time === selectedTime);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1472,6 +1471,7 @@ const SpecialistNewsPage: React.FC<{
 // - загружать новости, слоты и записи через API с Bearer-токеном.
 const App: React.FC = () => {
   const { user: currentUser, loading: authLoading, needsRoleSelect, roleSelectEmail, completeRoleSelect, getToken, refreshUser } = useClerkAuth();
+  const location = useLocation();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -1651,8 +1651,16 @@ const App: React.FC = () => {
     if (created.length > 0) setSlots((prev) => [...prev, ...created]);
   }, [currentUser, getToken]);
 
-  // Когда нужен выбор роли (профиль не синхронизирован с бэкендом)
-  if (needsRoleSelect) {
+  // Публичные маршруты, доступные без завершения регистрации профиля.
+  // Без этого списка needsRoleSelect блокировал ВСЕ страницы, включая главную.
+  const publicPaths = ['/', '/login', '/register', '/book/success', '/cancel'];
+  const isPublicRoute = publicPaths.some(
+    (p) => location.pathname === p || location.pathname.startsWith(p + '/')
+  );
+
+  // Когда нужен выбор роли (профиль не синхронизирован с бэкендом),
+  // блокируем только защищённые страницы; публичные (главная, вход, регистрация) остаются доступными.
+  if (needsRoleSelect && !isPublicRoute) {
     return (
       <div className="min-h-screen bg-slate-50">
         <Header currentUser={null} />

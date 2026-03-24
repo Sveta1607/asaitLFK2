@@ -1,6 +1,6 @@
 // api.ts — клиент для запросов к бэкенду (fetch), базовый URL и заголовки.
 // Также отправляет HTTP-ошибки (4xx/5xx) в Sentry как breadcrumbs и события.
-import type { Booking, HomeContent, NewsItem, TimeSlot, User } from './mockData';
+import type { Booking, HomeContent, NewsItem, SpecialistInfo, TimeSlot, User } from './mockData';
 import * as Sentry from '@sentry/react';
 
 // Базовый URL API из переменной окружения
@@ -47,9 +47,17 @@ async function parseError(res: Response): Promise<string> {
 // Этот блок создаётся, чтобы:
 // - синхронизировать профиль пользователя из Clerk в локальную БД;
 // - передавать email, username и выбранную роль (user/specialist).
+// Этот блок создаётся, чтобы при регистрации сразу передавать ФИО и телефон в профиль.
 export async function apiSyncFromClerk(
   token: string,
-  body: { email: string; username: string; role: 'user' | 'specialist' }
+  body: {
+    email: string;
+    username: string;
+    role: 'user' | 'specialist';
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+  }
 ): Promise<{ id: string; role: string; email: string; username?: string }> {
   const res = await fetch(`${API_BASE}/users/sync-from-clerk`, {
     method: 'POST',
@@ -104,6 +112,13 @@ export async function apiUpdateUser(
     headers: headers(token),
     body: JSON.stringify({ ...body }),
   });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+// --- Specialists (список специалистов для страницы записи) ---
+export async function apiGetSpecialists(token: string): Promise<SpecialistInfo[]> {
+  const res = await fetch(`${API_BASE}/users/specialists`, { headers: headers(token) });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }

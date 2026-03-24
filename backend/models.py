@@ -20,6 +20,15 @@ class UserResponse(BaseModel):
     phone: Optional[str] = None
 
 
+# Публичная информация о специалисте — для страницы выбора записи пациентом
+class SpecialistPublicResponse(BaseModel):
+    """Краткая карточка специалиста для отображения пациенту при выборе записи."""
+    id: str
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    email: str
+
+
 # --- Users ---
 class UserUpdateRequest(BaseModel):
     """

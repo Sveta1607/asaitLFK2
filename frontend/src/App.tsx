@@ -12,6 +12,7 @@ import {
   apiGetBookings,
   apiGetNews,
   apiGetSlots,
+  apiGetSpecialists,
   apiGetHomeContent,
   apiAddNews,
   apiUpdateHomeContent,
@@ -20,7 +21,7 @@ import {
   apiUpdateUser,
 } from './api';
 import { useClerkAuth, RoleSelectForm } from './ClerkAuth';
-import type { Booking, HomeContent, NewsItem, TimeSlot, User } from './mockData';
+import type { Booking, HomeContent, NewsItem, SpecialistInfo, TimeSlot, User } from './mockData';
 
 // Этот блок создаётся, чтобы иметь дефолтные тексты главной страницы
 // до загрузки данных с бэкенда или при временной ошибке API.
@@ -542,10 +543,54 @@ const ProfilePage: React.FC<{
   );
 };
 
-// Страница записи на приём для пациента
+// Карточка специалиста — отображается на шаге выбора специалиста перед записью
+const SpecialistCard: React.FC<{
+  specialist: SpecialistInfo;
+  freeSlotCount: number;
+  isSelected: boolean;
+  onClick: () => void;
+}> = ({ specialist, freeSlotCount, isSelected, onClick }) => {
+  const displayName = [specialist.lastName, specialist.firstName].filter(Boolean).join(' ') || 'Специалист';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'card group flex flex-col items-center gap-3 !p-5 text-center transition-all',
+        isSelected
+          ? 'border-2 border-mint-500 bg-mint-50/50 shadow-md'
+          : 'border-2 border-transparent hover:border-mint-200 hover:shadow-md',
+      ].join(' ')}
+    >
+      {/* Аватар специалиста */}
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-mint-100 text-2xl transition-transform group-hover:scale-105">
+        ⚕️
+      </span>
+      <div>
+        <h3 className="text-sm font-bold text-gray-800">{displayName}</h3>
+        <p className="mt-0.5 text-xs text-gray-400">{specialist.email}</p>
+      </div>
+      {/* Счётчик свободных слотов */}
+      <span className={[
+        'rounded-full px-3 py-1 text-[11px] font-bold',
+        freeSlotCount > 0
+          ? 'bg-mint-100 text-mint-700'
+          : 'bg-gray-100 text-gray-400',
+      ].join(' ')}>
+        {freeSlotCount > 0
+          ? `${freeSlotCount} свободн. слот${freeSlotCount === 1 ? '' : freeSlotCount < 5 ? 'а' : 'ов'}`
+          : 'Нет свободных слотов'}
+      </span>
+    </button>
+  );
+};
+
+// Страница записи на приём для пациента — двухшаговая: выбор специалиста, затем дата/время
 const BookingPage: React.FC<{
   currentUser: User | null;
   slots: TimeSlot[];
+  specialists: SpecialistInfo[];
+  specialistsLoading?: boolean;
   slotsLoading?: boolean;
   slotsError?: string | null;
   onCreateBooking: (payload: {
@@ -557,8 +602,12 @@ const BookingPage: React.FC<{
     firstName: string;
     phone?: string;
   }) => Promise<void>;
-}> = ({ currentUser, slots, slotsLoading, slotsError, onCreateBooking }) => {
+}> = ({ currentUser, slots, specialists, specialistsLoading, slotsLoading, slotsError, onCreateBooking }) => {
   const navigate = useNavigate();
+
+  // Шаг записи: 'specialist' — выбор специалиста, 'schedule' — выбор даты/времени
+  const [selectedSpecialistId, setSelectedSpecialistId] = useState<string | null>(null);
+  const [step, setStep] = useState<'specialist' | 'schedule'>('specialist');
 
   // Фильтрация: не показываем прошедшие даты и слоты с прошедшим временем
   const now = new Date();
@@ -576,10 +625,27 @@ const BookingPage: React.FC<{
     });
   }, [slots, todayStr, currentMinutes]);
 
-  const availableDates = useMemo(() => {
-    const dates = new Set(futureSlots.map((s) => s.date));
-    return Array.from(dates).sort();
+  // Свободные слоты выбранного специалиста
+  const specialistSlots = useMemo(
+    () => futureSlots.filter((s) => s.specialistId === selectedSpecialistId),
+    [futureSlots, selectedSpecialistId]
+  );
+
+  // Количество свободных слотов каждого специалиста — для отображения на карточках
+  const freeCountBySpecialist = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of futureSlots) {
+      if (s.status === 'free') {
+        counts[s.specialistId] = (counts[s.specialistId] || 0) + 1;
+      }
+    }
+    return counts;
   }, [futureSlots]);
+
+  const availableDates = useMemo(() => {
+    const dates = new Set(specialistSlots.map((s) => s.date));
+    return Array.from(dates).sort();
+  }, [specialistSlots]);
 
   const firstDate = availableDates[0] ?? '';
 
@@ -598,6 +664,14 @@ const BookingPage: React.FC<{
       setSelectedTime(null);
     }
   }, [availableDates]);
+
+  // Автоматический выбор единственного специалиста, если он один
+  useEffect(() => {
+    if (specialists.length === 1 && !selectedSpecialistId) {
+      setSelectedSpecialistId(specialists[0].id);
+      setStep('schedule');
+    }
+  }, [specialists, selectedSpecialistId]);
 
   if (!currentUser || currentUser.role !== 'user') {
     return (
@@ -618,13 +692,33 @@ const BookingPage: React.FC<{
     );
   }
 
-  // Слоты на выбранную дату (только будущие)
+  // Текущий выбранный специалист
+  const selectedSpecialist = specialists.find((s) => s.id === selectedSpecialistId);
+  const specialistDisplayName = selectedSpecialist
+    ? [selectedSpecialist.lastName, selectedSpecialist.firstName].filter(Boolean).join(' ') || 'Специалист'
+    : '';
+
+  // Слоты на выбранную дату для выбранного специалиста
   const dateSlots = useMemo(
-    () => futureSlots.filter((s) => s.date === selectedDate),
-    [futureSlots, selectedDate]
+    () => specialistSlots.filter((s) => s.date === selectedDate),
+    [specialistSlots, selectedDate]
   );
 
   const selectedSlot = dateSlots.find((s) => s.time === selectedTime);
+
+  const handleSelectSpecialist = (specId: string) => {
+    setSelectedSpecialistId(specId);
+    setSelectedDate('');
+    setSelectedTime(null);
+    setStep('schedule');
+  };
+
+  const handleBackToSpecialists = () => {
+    setStep('specialist');
+    setSelectedSpecialistId(null);
+    setSelectedDate('');
+    setSelectedTime(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -650,159 +744,212 @@ const BookingPage: React.FC<{
   };
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      {/* Выбор даты и времени */}
-      <section className="card mb-5">
-        <div className="mb-4 flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-100 text-xl">📅</span>
-          <div>
-            <h1 className="text-lg font-bold text-gray-800">Запись на приём</h1>
-            {dateSlots.length > 0 && dateSlots[0].specialistLastName && (
-              <p className="text-sm text-gray-500">
-                Специалист: <span className="font-semibold text-gray-700">
-                  {dateSlots[0].specialistLastName} {dateSlots[0].specialistFirstName}
-                </span>
-              </p>
-            )}
-          </div>
-        </div>
-
-        {slotsLoading && (
-          <div className="mb-3 rounded-xl bg-mint-50 px-4 py-2.5 text-xs font-semibold text-mint-700">
-            Загрузка доступного времени...
-          </div>
-        )}
-        {slotsError && (
-          <div className="mb-3 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600">
-            {slotsError}
-          </div>
-        )}
-
-        {/* Выбор даты */}
-        <div className="mb-4">
-          <label className="mb-1.5 block text-xs font-semibold text-gray-600">Дата</label>
-          <select
-            className="input-field"
-            value={availableDates.includes(selectedDate) ? selectedDate : firstDate}
-            onChange={(e) => {
-              setSelectedDate(e.target.value);
-              setSelectedTime(null);
-            }}
-          >
-            {availableDates.length === 0 ? (
-              <option value="">Нет доступных дат для записи</option>
-            ) : (
-              availableDates.map((d) => (
-                <option key={d} value={d}>
-                  {new Date(d + 'T12:00:00').toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </option>
-              ))
-            )}
-          </select>
-        </div>
-
-        {/* Сетка временных слотов */}
-        <div className="mb-2 text-xs font-semibold text-gray-600">Время</div>
-        {!slotsLoading && dateSlots.length === 0 && !slotsError && (
-          <p className="mb-2 text-xs text-gray-400">Нет доступных слотов на выбранную дату.</p>
-        )}
-        <div className="grid grid-cols-3 gap-2">
-          {dateSlots.map((slot) => {
-            const isBusy = slot.status === 'busy';
-            const isSelected = selectedTime === slot.time;
-            return (
-              <button
-                key={slot.id}
-                type="button"
-                disabled={isBusy}
-                onClick={() => setSelectedTime(slot.time)}
-                className={[
-                  'rounded-xl border-2 px-3 py-2 text-sm font-semibold transition-all',
-                  isBusy
-                    ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300'
-                    : isSelected
-                    ? 'border-mint-500 bg-mint-50 text-mint-700 shadow-sm'
-                    : 'border-gray-100 text-gray-600 hover:border-mint-300 hover:bg-mint-50/50'
-                ].join(' ')}
-              >
-                <div>{slot.time}</div>
-                <div className="text-[10px] font-normal">
-                  {isBusy ? 'Занято' : 'Свободно'}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-3 text-[11px] text-gray-400">
-          Другие пациенты не видят ваши данные — только статус «Свободно» или «Занято».
-        </p>
-      </section>
-
-      {/* Данные пациента */}
-      <section className="card">
-        <div className="mb-3 flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-coral-100 text-lg">✍️</span>
-          <h2 className="text-base font-bold text-gray-800">Данные пациента</h2>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Имя</label>
-              <input
-                type="text"
-                className="input-field"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
-            </div>
-            <div className="flex-1">
-              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фамилия</label>
-              <input
-                type="text"
-                className="input-field"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
+    <main className="mx-auto max-w-4xl px-4 py-8">
+      {/* Шаг 1: Выбор специалиста */}
+      {step === 'specialist' && (
+        <section className="card">
+          <div className="mb-5 flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-100 text-xl">⚕️</span>
+            <div>
+              <h1 className="text-lg font-bold text-gray-800">Выберите специалиста</h1>
+              <p className="text-xs text-gray-400">Нажмите на карточку, чтобы увидеть расписание</p>
             </div>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-gray-600">Телефон</label>
-            <input
-              type="tel"
-              className="input-field"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          </div>
-
-          {/* Чекбокс подтверждения возраста */}
-          <label className="flex items-center gap-2 text-xs text-gray-600">
-            <input
-              type="checkbox"
-              checked={over18}
-              onChange={(e) => setOver18(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-mint-500 focus:ring-mint-400"
-            />
-            <span className="font-medium">Мне уже исполнилось 18 лет</span>
-          </label>
-
-          <button
-            type="submit"
-            disabled={!selectedTime || !over18 || submitLoading}
-            className="btn-primary w-full"
-          >
-            {submitLoading ? 'Отправка...' : 'Подтвердить запись'}
-          </button>
-          {submitError && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{submitError}</p>
+          {specialistsLoading && (
+            <div className="rounded-xl bg-mint-50 px-4 py-2.5 text-xs font-semibold text-mint-700">
+              Загрузка списка специалистов...
+            </div>
           )}
-        </form>
-      </section>
+
+          {!specialistsLoading && specialists.length === 0 && (
+            <div className="py-6 text-center">
+              <span className="mb-2 inline-block text-3xl">📭</span>
+              <p className="text-sm text-gray-500">Специалисты ещё не зарегистрированы.</p>
+            </div>
+          )}
+
+          {/* Сетка карточек специалистов */}
+          {!specialistsLoading && specialists.length > 0 && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {specialists.map((spec) => (
+                <SpecialistCard
+                  key={spec.id}
+                  specialist={spec}
+                  freeSlotCount={freeCountBySpecialist[spec.id] || 0}
+                  isSelected={selectedSpecialistId === spec.id}
+                  onClick={() => handleSelectSpecialist(spec.id)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Шаг 2: Расписание выбранного специалиста */}
+      {step === 'schedule' && selectedSpecialist && (
+        <>
+          {/* Кнопка «Назад» — возвращает к выбору специалиста (если их больше одного) */}
+          {specialists.length > 1 && (
+            <button
+              type="button"
+              onClick={handleBackToSpecialists}
+              className="mb-4 flex items-center gap-1 text-sm font-semibold text-mint-600 transition-colors hover:text-mint-700"
+            >
+              ← К выбору специалиста
+            </button>
+          )}
+
+          {/* Информация о выбранном специалисте */}
+          <section className="card mb-5">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-100 text-xl">📅</span>
+              <div>
+                <h1 className="text-lg font-bold text-gray-800">Запись на приём</h1>
+                <p className="text-sm text-gray-500">
+                  Специалист: <span className="font-semibold text-gray-700">{specialistDisplayName}</span>
+                </p>
+              </div>
+            </div>
+
+            {slotsLoading && (
+              <div className="mb-3 rounded-xl bg-mint-50 px-4 py-2.5 text-xs font-semibold text-mint-700">
+                Загрузка доступного времени...
+              </div>
+            )}
+            {slotsError && (
+              <div className="mb-3 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600">
+                {slotsError}
+              </div>
+            )}
+
+            {/* Выбор даты */}
+            <div className="mb-4">
+              <label className="mb-1.5 block text-xs font-semibold text-gray-600">Дата</label>
+              <select
+                className="input-field"
+                value={availableDates.includes(selectedDate) ? selectedDate : firstDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setSelectedTime(null);
+                }}
+              >
+                {availableDates.length === 0 ? (
+                  <option value="">Нет доступных дат для записи</option>
+                ) : (
+                  availableDates.map((d) => (
+                    <option key={d} value={d}>
+                      {new Date(d + 'T12:00:00').toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            {/* Сетка временных слотов */}
+            <div className="mb-2 text-xs font-semibold text-gray-600">Время</div>
+            {!slotsLoading && dateSlots.length === 0 && !slotsError && (
+              <p className="mb-2 text-xs text-gray-400">Нет доступных слотов на выбранную дату.</p>
+            )}
+            <div className="grid grid-cols-3 gap-2">
+              {dateSlots.map((slot) => {
+                const isBusy = slot.status === 'busy';
+                const isSelected = selectedTime === slot.time;
+                return (
+                  <button
+                    key={slot.id}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => setSelectedTime(slot.time)}
+                    className={[
+                      'rounded-xl border-2 px-3 py-2 text-sm font-semibold transition-all',
+                      isBusy
+                        ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300'
+                        : isSelected
+                        ? 'border-mint-500 bg-mint-50 text-mint-700 shadow-sm'
+                        : 'border-gray-100 text-gray-600 hover:border-mint-300 hover:bg-mint-50/50'
+                    ].join(' ')}
+                  >
+                    <div>{slot.time}</div>
+                    <div className="text-[10px] font-normal">
+                      {isBusy ? 'Занято' : 'Свободно'}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-[11px] text-gray-400">
+              Другие пациенты не видят ваши данные — только статус «Свободно» или «Занято».
+            </p>
+          </section>
+
+          {/* Данные пациента */}
+          <section className="card">
+            <div className="mb-3 flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-coral-100 text-lg">✍️</span>
+              <h2 className="text-base font-bold text-gray-800">Данные пациента</h2>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-600">Имя</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фамилия</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-600">Телефон</label>
+                <input
+                  type="tel"
+                  className="input-field"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+
+              {/* Чекбокс подтверждения возраста */}
+              <label className="flex items-center gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={over18}
+                  onChange={(e) => setOver18(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-mint-500 focus:ring-mint-400"
+                />
+                <span className="font-medium">Мне уже исполнилось 18 лет</span>
+              </label>
+
+              <button
+                type="submit"
+                disabled={!selectedTime || !over18 || submitLoading}
+                className="btn-primary w-full"
+              >
+                {submitLoading ? 'Отправка...' : 'Подтвердить запись'}
+              </button>
+              {submitError && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{submitError}</p>
+              )}
+            </form>
+          </section>
+        </>
+      )}
     </main>
   );
 };
@@ -1771,6 +1918,9 @@ const App: React.FC = () => {
   const [homeContent, setHomeContent] = useState<HomeContent>(DEFAULT_HOME_CONTENT);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  // Список специалистов — загружается для страницы записи пациента
+  const [specialists, setSpecialists] = useState<SpecialistInfo[]>([]);
+  const [loadingSpecialists, setLoadingSpecialists] = useState(false);
   const [loadingNews, setLoadingNews] = useState(true);
   const [errorNews, setErrorNews] = useState<string | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -1835,6 +1985,39 @@ const App: React.FC = () => {
     }
   }, [currentUser, getToken]);
 
+  // Загрузка списка специалистов для страницы записи пациента.
+  // Если эндпоинт /users/specialists ещё не задеплоен, извлекаем специалистов из слотов.
+  const fetchSpecialists = useCallback(async () => {
+    if (!currentUser) return;
+    const token = await getToken();
+    if (!token) return;
+    setLoadingSpecialists(true);
+    try {
+      const data = await apiGetSpecialists(token);
+      if (Array.isArray(data) && data.length > 0) {
+        setSpecialists(data);
+        setLoadingSpecialists(false);
+        return;
+      }
+    } catch {
+      // эндпоинт ещё не задеплоен — fallback ниже
+    }
+    // Fallback: извлекаем уникальных специалистов из уже загруженных слотов
+    const seen = new Map<string, SpecialistInfo>();
+    for (const s of slots) {
+      if (!seen.has(s.specialistId)) {
+        seen.set(s.specialistId, {
+          id: s.specialistId,
+          firstName: s.specialistFirstName ?? null,
+          lastName: s.specialistLastName ?? null,
+          email: '',
+        });
+      }
+    }
+    setSpecialists(Array.from(seen.values()));
+    setLoadingSpecialists(false);
+  }, [currentUser, getToken, slots]);
+
   useEffect(() => {
     fetchNews();
     fetchHomeContent();
@@ -1847,12 +2030,22 @@ const App: React.FC = () => {
     } else {
       setSlots([]);
       setBookings([]);
+      setSpecialists([]);
       setLoadingSlots(false);
       setLoadingBookings(false);
+      setLoadingSpecialists(false);
       setErrorSlots(null);
       setErrorBookings(null);
     }
   }, [currentUser, fetchSlots, fetchBookings]);
+
+  // Загрузка специалистов запускается после загрузки слотов, чтобы fallback мог
+  // извлечь список специалистов из слотов, если API-эндпоинт ещё не задеплоен.
+  useEffect(() => {
+    if (currentUser && !loadingSlots) {
+      fetchSpecialists();
+    }
+  }, [currentUser, loadingSlots, fetchSpecialists]);
 
   const handleCreateBookingByUser = useCallback(async (payload: {
     slotId: string;
@@ -2108,6 +2301,8 @@ const App: React.FC = () => {
             <BookingPage
               currentUser={currentUser}
               slots={slots}
+              specialists={specialists}
+              specialistsLoading={loadingSpecialists}
               slotsLoading={loadingSlots}
               slotsError={errorSlots}
               onCreateBooking={handleCreateBookingByUser}

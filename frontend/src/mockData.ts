@@ -14,6 +14,14 @@ export type User = {
   phone?: string;
 };
 
+// Краткая информация о специалисте — для карточек выбора на странице записи
+export type SpecialistInfo = {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email: string;
+};
+
 // Тип слота времени для записи (включает ФИО специалиста)
 export type TimeSlot = {
   id: string;

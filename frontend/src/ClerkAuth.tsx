@@ -4,16 +4,28 @@ import { useAuth, useUser } from '@clerk/clerk-react';
 import { apiGetMe, apiSyncFromClerk } from './api';
 import type { User } from './mockData';
 
-// Компонент выбора роли и логина после первого входа через Clerk
+// Данные регистрационной формы — передаются в onComplete для синхронизации с бэкендом
+interface RoleSelectData {
+  role: 'user' | 'specialist';
+  username: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+}
+
+// Компонент выбора роли, логина и заполнения профиля после первого входа через Clerk
 function RoleSelectForm({
   email,
   onComplete,
 }: {
   email: string;
-  onComplete: (role: 'user' | 'specialist', username: string) => Promise<void>;
+  onComplete: (data: RoleSelectData) => Promise<void>;
 }) {
   const [role, setRole] = useState<'user' | 'specialist'>('user');
   const [username, setUsername] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +44,7 @@ function RoleSelectForm({
     setError(null);
     setLoading(true);
     try {
-      await onComplete(role, username);
+      await onComplete({ role, username, firstName, lastName, phone });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка синхронизации');
     } finally {
@@ -49,7 +61,7 @@ function RoleSelectForm({
           Добро пожаловать!
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Выберите роль и придумайте логин
+          Заполните данные для завершения регистрации
         </p>
       </div>
 
@@ -101,6 +113,42 @@ function RoleSelectForm({
               3–32 символа, ТОЛЬКО латинские буквы
             </p>
           )}
+        </div>
+
+        {/* Поля ФИО — заполняются при регистрации и сразу сохраняются в профиль */}
+        <div className="grid gap-3 grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-600">Имя</label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Иван"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-600">Фамилия</label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Иванов"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Телефон — сохраняется в профиль при регистрации */}
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-gray-600">Телефон</label>
+          <input
+            type="tel"
+            className="input-field"
+            placeholder="+7 (999) 123-45-67"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
         </div>
 
         <div className="rounded-xl bg-mint-50 px-3 py-2 text-xs font-medium text-mint-700">
@@ -168,10 +216,24 @@ export function useClerkAuth() {
     refreshUser();
   }, [isSignedIn, userId]);
 
-  const completeRoleSelect = async (role: 'user' | 'specialist', username: string) => {
+  // Этот блок обновлён, чтобы передавать ФИО и телефон на бэкенд при завершении регистрации.
+  const completeRoleSelect = async (data: {
+    role: 'user' | 'specialist';
+    username: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+  }) => {
     const token = await getToken();
     if (!token) return;
-    await apiSyncFromClerk(token, { email: roleSelectEmail, username, role });
+    await apiSyncFromClerk(token, {
+      email: roleSelectEmail,
+      username: data.username,
+      role: data.role,
+      firstName: data.firstName || undefined,
+      lastName: data.lastName || undefined,
+      phone: data.phone || undefined,
+    });
     await refreshUser();
   };
 

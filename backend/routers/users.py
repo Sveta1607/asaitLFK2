@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from auth_deps import RequireSuperuser, RequireUser, get_clerk_payload
 from db import get_db
 from db_models import User
-from models import UserUpdateRequest, UserResponse
+from models import UserUpdateRequest, UserResponse, SpecialistPublicResponse
 from logger import get_logger
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -22,7 +22,8 @@ class ClerkSyncRequest(BaseModel):
     Эта схема создаётся, чтобы:
     - описать и валидировать данные, приходящие из Clerk (webhook / фронтенд);
     - убедиться, что username соответствует правилам (ТОЛЬКО латинские буквы без цифр и спецсимволов);
-    - ограничить роль только разрешёнными значениями.
+    - ограничить роль только разрешёнными значениями;
+    - сохранять ФИО и телефон при регистрации в профиль пользователя.
     """
 
     email: str = Field(..., description="E-mail пользователя из Clerk")
@@ -30,6 +31,11 @@ class ClerkSyncRequest(BaseModel):
     # из латинских букв (без цифр и спецсимволов), соответствуя требованиям ТЗ.
     username: str = Field(..., description="Логин пользователя (только латинские буквы без цифр и спецсимволов)")
     role: str = Field("user", description="Роль в приложении: user или specialist")
+    # Эти поля создаются, чтобы сохранять ФИО и телефон сразу при регистрации,
+    # а не заставлять пользователя заполнять профиль отдельно после входа.
+    firstName: Optional[str] = Field(None, description="Имя пользователя")
+    lastName: Optional[str] = Field(None, description="Фамилия пользователя")
+    phone: Optional[str] = Field(None, description="Телефон пользователя")
 
     @field_validator("username")
     @classmethod
@@ -113,6 +119,26 @@ def update_me(body: UserUpdateRequest, current_user: RequireUser, db: Session = 
     )
 
 
+@router.get("/specialists", response_model=list[SpecialistPublicResponse])
+def list_specialists(current_user: RequireUser, db: Session = Depends(get_db)):
+    """
+    Этот обработчик создаётся, чтобы:
+    - позволить авторизованному пациенту увидеть список специалистов;
+    - показать карточку каждого специалиста на странице записи.
+    """
+    stmt = select(User).where(User.role == "specialist", User.approved == True)
+    specialists = db.execute(stmt).scalars().all()
+    return [
+        SpecialistPublicResponse(
+            id=s.id,
+            firstName=s.first_name,
+            lastName=s.last_name,
+            email=s.email,
+        )
+        for s in specialists
+    ]
+
+
 @router.post("/sync-from-clerk", status_code=status.HTTP_200_OK)
 def sync_from_clerk(
     body: ClerkSyncRequest,
@@ -149,6 +175,9 @@ def sync_from_clerk(
             clerk_id=clerk_id,
             username=body.username,
             email=body.email.strip(),
+            first_name=(body.firstName or "").strip() or None,
+            last_name=(body.lastName or "").strip() or None,
+            phone=(body.phone or "").strip() or None,
             approved=True,
         )
         db.add(user)
