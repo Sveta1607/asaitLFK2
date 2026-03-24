@@ -19,10 +19,18 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 # Блок: базовая конфигурация подключения к БД.
 # Нужен, чтобы читать строку подключения из переменных окружения и создать движок SQLAlchemy.
-# По умолчанию используем локальный SQLite-файл, чтобы бэкенд мог работать без запущенного PostgreSQL.
+# Если DATABASE_URL не задан, используем SQLite. Путь к файлу зависит от среды:
+# — в Amvera/Docker каталог /data монтируется как persistent volume, поэтому БД выживает при пересборке;
+# — локально (без /data) файл создаётся рядом с кодом, как и раньше.
+_PERSISTENT_DIR = "/data"
+_sqlite_path = (
+    f"{_PERSISTENT_DIR}/lfk_app.db"
+    if os.path.isdir(_PERSISTENT_DIR)
+    else "./lfk_app.db"
+)
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "sqlite:///./lfk_app.db",
+    f"sqlite:///{_sqlite_path}",
 )
 
 # Этот блок создаётся, чтобы:
@@ -133,7 +141,8 @@ def init_db() -> None:
 
         # Этот блок создаётся, чтобы мягко деградировать на SQLite,
         # если в окружении задан нерабочий localhost Postgres.
-        fallback_url = "sqlite:///./lfk_app.db"
+        # Используем _sqlite_path, чтобы fallback тоже шёл на persistent volume.
+        fallback_url = f"sqlite:///{_sqlite_path}"
         print(
             "WARN: DATABASE_URL указывает на localhost Postgres, который недоступен. "
             f"Переключаемся на {fallback_url}. Исходная ошибка: {exc}"

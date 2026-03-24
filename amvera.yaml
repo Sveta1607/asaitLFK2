@@ -1,17 +1,14 @@
 ---
+# Этот файл создаётся, чтобы Amvera-проект фронтенда собирал контейнер с Nginx.
+# Бэкенд (проект lfk-b) настраивается через UI Amvera — включая persistenceMount: /data.
 meta:
   environment: docker
   toolchain:
     name: docker
     version: latest
-# Используем Dockerfile.frontend — он копирует frontend/ при контексте = корень (обход .dockerignore).
 build:
   dockerfile: Dockerfile.frontend
   skip: false
 run:
-  persistenceMount: /data
-  image: null
-  command: null
-  args: null
   containerPort: 80
   servicePort: 80
