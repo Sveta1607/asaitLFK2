@@ -3,7 +3,14 @@
 # удобном для парсинга системами мониторинга (Amvera logs, ELK, Grafana Loki).
 import logging
 import sys
-from pythonjsonlogger import jsonlogger
+
+# Безопасный импорт — если пакет недоступен, используем обычный форматтер,
+# чтобы приложение не падало при старте из-за отсутствия библиотеки логирования.
+try:
+    from pythonjsonlogger import jsonlogger
+    _HAS_JSON_LOGGER = True
+except ImportError:
+    _HAS_JSON_LOGGER = False
 
 
 def setup_logging(level: str = "INFO") -> logging.Logger:
@@ -16,15 +23,19 @@ def setup_logging(level: str = "INFO") -> logging.Logger:
 
     if not logger.handlers:
         handler = logging.StreamHandler(sys.stdout)
-        # JSON-формат включает timestamp, level, message и все extra-поля
-        formatter = jsonlogger.JsonFormatter(
-            fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
-            datefmt="%Y-%m-%dT%H:%M:%S",
-        )
+        if _HAS_JSON_LOGGER:
+            formatter = jsonlogger.JsonFormatter(
+                fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%S",
+            )
+        else:
+            formatter = logging.Formatter(
+                fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%S",
+            )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    # Подавляем дублирование логов через корневой логгер
     logger.propagate = False
     return logger
 

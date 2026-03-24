@@ -11,6 +11,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Python: байткод и кэш не должны попадать в репозиторий
+__pycache__/
+*.pyc
+*.pyo
+
 # Файлы операционной системы
 .DS_Store
 Thumbs.db
