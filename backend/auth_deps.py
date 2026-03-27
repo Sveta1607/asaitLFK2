@@ -236,3 +236,46 @@ RequireUser = Annotated[User, Depends(get_current_user)]
 RequireApproved = Annotated[User, Depends(get_current_user_approved)]
 RequireSpecialist = Annotated[User, Depends(require_role(["specialist"]))]
 RequireSuperuser = Annotated[User, Depends(require_role(["superuser"]))]
+
+
+def _ensure_telegram_bot_secret_from_file() -> None:
+    """
+    Этот блок создаётся, чтобы:
+    - подставить TELEGRAM_BOT_API_SECRET из backend/.env, если в окружении пустая строка
+      (IDE часто задаёт переменную без значения и load_dotenv её не перезаписывает).
+    """
+    if (os.getenv("TELEGRAM_BOT_API_SECRET") or "").strip():
+        return
+    env_path = Path(__file__).resolve().parent / ".env"
+    if not env_path.is_file():
+        return
+    vals = dotenv_values(env_path)
+    v = (vals.get("TELEGRAM_BOT_API_SECRET") or "").strip()
+    if v:
+        os.environ["TELEGRAM_BOT_API_SECRET"] = v
+
+
+def require_telegram_bot_secret(
+    x_telegram_bot_secret: Optional[str] = Header(None, alias="X-Telegram-Bot-Secret"),
+    authorization: Optional[str] = Header(None),
+) -> None:
+    """
+    Эта зависимость создаётся, чтобы:
+    - разрешать доступ к эндпоинтам Telegram-бота только при совпадении секрета из .env;
+    - принимать секрет в заголовке X-Telegram-Bot-Secret или как Bearer (как удобнее в Node).
+    """
+    _ensure_telegram_bot_secret_from_file()
+    expected = (os.getenv("TELEGRAM_BOT_API_SECRET") or "").strip()
+    if not expected:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="TELEGRAM_BOT_API_SECRET не задан на сервере",
+        )
+    provided = (x_telegram_bot_secret or "").strip()
+    if not provided and authorization and authorization.startswith("Bearer "):
+        provided = authorization[7:].strip()
+    if not provided or provided != expected:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Неверный или отсутствующий секрет бота",
+        )

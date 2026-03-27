@@ -47,8 +47,8 @@ def init_store() -> None:
         "id": "spec1",
         "role": "specialist",
         "email": "specialist@example.com",
-        "firstName": "Анна",
-        "lastName": "Смирнова",
+        "firstName": "Светлана",
+        "lastName": "Головчанская",
     }
 
     # Моковые новости

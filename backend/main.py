@@ -1,15 +1,39 @@
 # main.py — точка входа FastAPI, CORS, подключение роутеров, Sentry, логирование
 import os
 import time
+from pathlib import Path
 
 import sentry_sdk
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-# Блок: загрузка переменных окружения.
-# override=False — переменные из Amvera UI имеют приоритет перед локальным .env-файлом.
-load_dotenv(override=False)
+# Блок: загрузка переменных окружения из backend/.env рядом с main.py.
+# Иначе при запуске uvicorn из другой папки (IDE, корень репозитория) find_dotenv не находит файл
+# и TELEGRAM_BOT_API_SECRET / DATABASE_URL не попадают в процесс.
+_backend_env = Path(__file__).resolve().parent / ".env"
+load_dotenv(_backend_env, override=False)
+
+# Если в системе/IDE уже есть TELEGRAM_BOT_API_SECRET="" (пустая строка), load_dotenv с override=False
+# НЕ перезаписывает её значением из файла — бот получает 503. Дополняем только пустые ключи из .env.
+if _backend_env.is_file():
+    _file_vals = dotenv_values(_backend_env)
+    for _key in (
+        "TELEGRAM_BOT_API_SECRET",
+        "ALLOWED_SPECIALIST_EMAIL",
+        "DATABASE_URL",
+        "CLERK_JWKS_URL",
+        "CLERK_ISSUER",
+        "SENTRY_DSN",
+    ):
+        _raw = _file_vals.get(_key)
+        if _raw is None:
+            continue
+        _v = str(_raw).strip()
+        if not _v:
+            continue
+        if not (os.environ.get(_key) or "").strip():
+            os.environ[_key] = _v
 
 # Инициализация Sentry — отправляет ошибки и трассировки в Sentry Dashboard.
 # DSN берётся из .env; если пустой, SDK не инициализируется (безопасно для локальной разработки).
@@ -33,7 +57,7 @@ logger = setup_logging()
 # иначе будет использован дефолтный SQLite и возможны несовпадения схемы (например, нет users.username).
 from db import init_db  # noqa: E402
 # auth роутер отключён: регистрация и вход через Clerk (фронтенд).
-from routers import users, news, slots, bookings, site_content  # noqa: F401,E402
+from routers import users, news, slots, bookings, site_content, telegram_bot  # noqa: F401,E402
 
 app = FastAPI(
     title="API Сайт ЛФК",
@@ -96,6 +120,7 @@ app.include_router(news.router, prefix="/api")
 app.include_router(slots.router, prefix="/api")
 app.include_router(bookings.router, prefix="/api")
 app.include_router(site_content.router, prefix="/api")
+app.include_router(telegram_bot.router, prefix="/api")
 
 
 @app.on_event("startup")

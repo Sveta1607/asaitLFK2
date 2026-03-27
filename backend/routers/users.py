@@ -1,10 +1,11 @@
 # routers/users.py — эндпоинты профиля пользователя.
 # Также логирует бизнес-события: регистрация, синхронизация, смена роли.
+import os
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from auth_deps import RequireSuperuser, RequireUser, get_clerk_payload
@@ -15,6 +16,26 @@ from logger import get_logger
 
 router = APIRouter(prefix="/users", tags=["users"])
 log = get_logger()
+
+
+def _allowed_specialist_email_norm() -> str:
+    """E-mail единственного разрешённого специалиста (из .env или значение по умолчанию)."""
+    return (os.getenv("ALLOWED_SPECIALIST_EMAIL") or "Sharunkina2014@yandex.ru").strip().lower()
+
+
+def _require_specialist_email_allowed(email: str, role: str) -> None:
+    """Запрещает роль specialist всем, кроме адреса из ALLOWED_SPECIALIST_EMAIL."""
+    if role != "specialist":
+        return
+    if (email or "").strip().lower() != _allowed_specialist_email_norm():
+        allowed = _allowed_specialist_email_norm()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "detail": f"Роль «специалист» доступна только для e-mail: {allowed}",
+                "code": "SPECIALIST_EMAIL_NOT_ALLOWED",
+            },
+        )
 
 
 class ClerkSyncRequest(BaseModel):
@@ -158,10 +179,25 @@ def sync_from_clerk(
             detail="В токене Clerk отсутствует sub (clerk_id)",
         )
 
+    _require_specialist_email_allowed(body.email, body.role)
+
     stmt = select(User).where(User.clerk_id == clerk_id)
     user = db.execute(stmt).scalar_one_or_none()
 
     if user is None:
+        # Один специалист в системе: если уже есть specialist, второго с тем же разрешённым e-mail не создаём.
+        if body.role == "specialist":
+            spec_count = db.execute(
+                select(func.count(User.id)).where(User.role == "specialist")
+            ).scalar_one()
+            if spec_count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "detail": "Специалист уже зарегистрирован. Дополнительная регистрация как специалист невозможна.",
+                        "code": "SPECIALIST_ALREADY_EXISTS",
+                    },
+                )
         # Этот блок создаётся, чтобы:
         # - создать нового пользователя с ролью из body.role;
         # - сгенерировать id в формате, совместимом с фронтендом (u-* или spec-*).
@@ -269,6 +305,8 @@ def change_user_role(
             status_code=404,
             detail={"detail": "Пользователь не найден.", "code": "USER_NOT_FOUND"},
         )
+    if body.role == "specialist":
+        _require_specialist_email_allowed(user.email, "specialist")
     old_role = user.role
     user.role = body.role
     db.add(user)

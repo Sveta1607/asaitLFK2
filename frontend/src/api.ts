@@ -3,9 +3,50 @@
 import type { Booking, HomeContent, NewsItem, SpecialistInfo, TimeSlot, User } from './mockData';
 import * as Sentry from '@sentry/react';
 
-// Базовый URL API из переменной окружения
-const API_BASE = import.meta.env.VITE_API_URL || 'https://lfk-b-svetlanagolovchanskaya.amvera.io/api';
 const HOME_CONTENT_STORAGE_KEY = 'lfk-home-content-fallback';
+
+/** Приводит URL к виду …/api (роуты FastAPI под префиксом /api). */
+function normalizeApiBase(raw: string): string {
+  let u = (raw || '').trim().replace(/\/+$/, '');
+  if (!u.endsWith('/api')) {
+    u = `${u}/api`;
+  }
+  return u;
+}
+
+/**
+ * В dev по умолчанию локальный бэкенд; иначе запросы шли бы на Amvera без frontend/.env — NetworkError.
+ * В production — URL деплоя, если VITE_API_URL не задан при сборке.
+ */
+const _rawBase =
+  import.meta.env.VITE_API_URL?.trim() ||
+  (import.meta.env.DEV
+    ? 'http://127.0.0.1:3000'
+    : 'https://lfk-b-svetlanagolovchanskaya.amvera.io');
+const API_BASE = normalizeApiBase(_rawBase);
+
+/**
+ * Обёртка над fetch: «NetworkError» в браузере заменяем на понятный текст (часто — не запущен API или неверный VITE_API_URL).
+ */
+async function fetchApi(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await globalThis.fetch(input, init);
+  } catch (err) {
+    const m = err instanceof Error ? err.message : String(err);
+    const isNetwork =
+      /NetworkError|Failed to fetch|Load failed|Network request failed|fetch/i.test(m) ||
+      (err instanceof TypeError && /fetch|network/i.test(m));
+    if (isNetwork) {
+      throw new Error(
+        `Нет связи с API (${API_BASE}). ` +
+          (import.meta.env.DEV
+            ? 'Запустите бэкенд: cd backend → python -m uvicorn main:app --host 127.0.0.1 --port 3000. При необходимости в frontend/.env: VITE_API_URL=http://127.0.0.1:3000/api'
+            : 'Проверьте VITE_API_URL при сборке фронта и доступность бэкенда (CORS, HTTPS).'),
+      );
+    }
+    throw err;
+  }
+}
 
 // Заголовки для запросов с авторизацией через Bearer-токен Clerk
 function headers(token?: string): Record<string, string> {
@@ -59,7 +100,7 @@ export async function apiSyncFromClerk(
     phone?: string;
   }
 ): Promise<{ id: string; role: string; email: string; username?: string }> {
-  const res = await fetch(`${API_BASE}/users/sync-from-clerk`, {
+  const res = await fetchApi(`${API_BASE}/users/sync-from-clerk`, {
     method: 'POST',
     headers: headers(token),
     body: JSON.stringify(body),
@@ -70,7 +111,7 @@ export async function apiSyncFromClerk(
 
 // Этот блок создаётся, чтобы получать профиль текущего пользователя по JWT Clerk.
 export async function apiGetMe(token: string): Promise<User> {
-  const res = await fetch(`${API_BASE}/users/me`, { headers: headers(token) });
+  const res = await fetchApi(`${API_BASE}/users/me`, { headers: headers(token) });
   // Явно пробрасываем 403 как специальный маркер для показа выбора роли
   if (res.status === 403) {
     throw new Error('403');
@@ -86,7 +127,7 @@ export async function apiAuth(
 ): Promise<User> {
   // Этот блок остаётся для совместимости, но в новой версии авторизация будет происходить через Clerk.
   const url = mode === 'login' ? `${API_BASE}/auth/login` : `${API_BASE}/auth/register`;
-  const res = await fetch(url, {
+  const res = await fetchApi(url, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify(body),
@@ -107,7 +148,7 @@ export async function apiUpdateUser(
   // Этот блок создаётся, чтобы:
   // - отправлять на бэкенд все редактируемые поля профиля;
   // - использовать один и тот же метод для пациента и специалиста.
-  const res = await fetch(`${API_BASE}/users/me`, {
+  const res = await fetchApi(`${API_BASE}/users/me`, {
     method: 'PATCH',
     headers: headers(token),
     body: JSON.stringify({ ...body }),
@@ -118,14 +159,14 @@ export async function apiUpdateUser(
 
 // --- Specialists (список специалистов для страницы записи) ---
 export async function apiGetSpecialists(token: string): Promise<SpecialistInfo[]> {
-  const res = await fetch(`${API_BASE}/users/specialists`, { headers: headers(token) });
+  const res = await fetchApi(`${API_BASE}/users/specialists`, { headers: headers(token) });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }
 
 // --- News ---
 export async function apiGetNews(): Promise<NewsItem[]> {
-  const res = await fetch(`${API_BASE}/news`);
+  const res = await fetchApi(`${API_BASE}/news`);
   if (!res.ok) throw new Error(await parseError(res));
   const items = (await res.json()) as NewsItem[];
   return items;
@@ -135,7 +176,7 @@ export async function apiAddNews(
   token: string,
   body: { title: string; excerpt: string; imageUrl: string }
 ): Promise<NewsItem> {
-  const res = await fetch(`${API_BASE}/news`, {
+  const res = await fetchApi(`${API_BASE}/news`, {
     method: 'POST',
     headers: headers(token),
     body: JSON.stringify(body),
@@ -149,7 +190,7 @@ export async function apiUpdateNews(
   newsId: string,
   body: { title: string; excerpt: string; imageUrl: string }
 ): Promise<NewsItem> {
-  const res = await fetch(`${API_BASE}/news/${newsId}`, {
+  const res = await fetchApi(`${API_BASE}/news/${newsId}`, {
     method: 'PATCH',
     headers: headers(token),
     body: JSON.stringify(body),
@@ -160,7 +201,7 @@ export async function apiUpdateNews(
 
 // Удаление новости — только специалист (JWT Clerk).
 export async function apiDeleteNews(token: string, newsId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/news/${newsId}`, {
+  const res = await fetchApi(`${API_BASE}/news/${newsId}`, {
     method: 'DELETE',
     headers: headers(token),
   });
@@ -170,7 +211,7 @@ export async function apiDeleteNews(token: string, newsId: string): Promise<void
 // --- Site content (главная страница) ---
 export async function apiGetHomeContent(): Promise<HomeContent> {
   // Этот блок создаётся, чтобы публично загружать редактируемый контент главной страницы.
-  const res = await fetch(`${API_BASE}/site-content/home`);
+  const res = await fetchApi(`${API_BASE}/site-content/home`);
   if (res.ok) {
     const data = (await res.json()) as HomeContent;
     try {
@@ -195,7 +236,7 @@ export async function apiUpdateHomeContent(
   body: HomeContent
 ): Promise<HomeContent> {
   // Этот блок создаётся, чтобы позволить специалисту обновлять тексты главной страницы.
-  const res = await fetch(`${API_BASE}/site-content/home`, {
+  const res = await fetchApi(`${API_BASE}/site-content/home`, {
     method: 'PATCH',
     headers: headers(token),
     body: JSON.stringify(body),
@@ -232,7 +273,7 @@ export async function apiGetSlots(
   if (date) params.set('date', date);
   const query = params.toString();
   const url = query ? `${API_BASE}/slots?${query}` : `${API_BASE}/slots`;
-  const res = await fetch(url, { headers: headers(token) });
+  const res = await fetchApi(url, { headers: headers(token) });
   if (!res.ok) throw new Error(await parseError(res));
   const items = (await res.json()) as TimeSlot[];
   return items;
@@ -242,7 +283,7 @@ export async function apiCreateSlot(
   token: string,
   body: { specialistId: string; date: string; time: string }
 ): Promise<TimeSlot> {
-  const res = await fetch(`${API_BASE}/slots`, {
+  const res = await fetchApi(`${API_BASE}/slots`, {
     method: 'POST',
     headers: headers(token),
     body: JSON.stringify(body),
@@ -255,7 +296,7 @@ export async function apiCreateSlotsBatch(
   token: string,
   body: { specialistId: string; date: string; times: string[] }
 ): Promise<TimeSlot[]> {
-  const res = await fetch(`${API_BASE}/slots/batch`, {
+  const res = await fetchApi(`${API_BASE}/slots/batch`, {
     method: 'POST',
     headers: headers(token),
     body: JSON.stringify(body),
@@ -265,7 +306,7 @@ export async function apiCreateSlotsBatch(
 }
 
 export async function apiDeleteSlot(token: string, slotId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/slots/${slotId}`, {
+  const res = await fetchApi(`${API_BASE}/slots/${slotId}`, {
     method: 'DELETE',
     headers: headers(token),
   });
@@ -280,7 +321,7 @@ export async function apiGetBookings(
   const q = new URLSearchParams();
   if (params.userId) q.set('userId', params.userId);
   if (params.specialistId) q.set('specialistId', params.specialistId);
-  const res = await fetch(`${API_BASE}/bookings?${q}`, { headers: headers(token) });
+  const res = await fetchApi(`${API_BASE}/bookings?${q}`, { headers: headers(token) });
   if (!res.ok) throw new Error(await parseError(res));
   const items = (await res.json()) as Booking[];
   return items;
@@ -296,7 +337,7 @@ export async function apiCreateBookingByPatient(
     phone?: string;
   }
 ): Promise<Booking & { cancelToken?: string }> {
-  const res = await fetch(`${API_BASE}/bookings`, {
+  const res = await fetchApi(`${API_BASE}/bookings`, {
     method: 'POST',
     headers: headers(token),
     body: JSON.stringify({ ...body }),
@@ -316,7 +357,7 @@ export async function apiCreateBookingBySpecialist(
     phone?: string;
   }
 ): Promise<Booking & { cancelToken?: string }> {
-  const res = await fetch(`${API_BASE}/bookings`, {
+  const res = await fetchApi(`${API_BASE}/bookings`, {
     method: 'POST',
     headers: headers(token),
     body: JSON.stringify(body),
@@ -326,7 +367,7 @@ export async function apiCreateBookingBySpecialist(
 }
 
 export async function apiCancelBooking(token: string, bookingId: string): Promise<{ id: string; status: string }> {
-  const res = await fetch(`${API_BASE}/bookings/${bookingId}/cancel`, {
+  const res = await fetchApi(`${API_BASE}/bookings/${bookingId}/cancel`, {
     method: 'PATCH',
     headers: headers(token),
     body: JSON.stringify({}),

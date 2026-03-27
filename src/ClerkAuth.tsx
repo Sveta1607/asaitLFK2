@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { apiGetMe, apiSyncFromClerk } from './api';
 import type { User } from './mockData';
+import { canRegisterAsSpecialist } from './specialistGate';
 
 // Компонент выбора роли и логина после первого входа через Clerk
 // Этот блок создаётся, чтобы:
@@ -23,6 +24,7 @@ function RoleSelectForm({
   const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const specialistAllowed = canRegisterAsSpecialist(email);
 
   // Этот блок создаётся, чтобы:
   // - проверять, что логин состоит ТОЛЬКО из латинских букв (A–Z, a–z);
@@ -36,6 +38,10 @@ function RoleSelectForm({
     e.preventDefault();
     if (!usernameValid) {
       setError('Логин: 3–32 символа, ТОЛЬКО латинские буквы без цифр и спецсимволов');
+      return;
+    }
+    if (role === 'specialist' && !specialistAllowed) {
+      setError('Роль «специалист» доступна только для адреса, указанного администратором.');
       return;
     }
     setError(null);
@@ -74,16 +80,29 @@ function RoleSelectForm({
             </button>
             <button
               type="button"
-              onClick={() => setRole('specialist')}
+              disabled={!specialistAllowed}
+              title={
+                specialistAllowed
+                  ? undefined
+                  : 'Специалист — только для адреса, заданного администратором'
+              }
+              onClick={() => specialistAllowed && setRole('specialist')}
               className={
-                role === 'specialist'
-                  ? 'flex-1 rounded-md bg-sky-600 px-3 py-2 font-medium text-white'
-                  : 'flex-1 rounded-md border border-slate-200 px-3 py-2 text-slate-700'
+                !specialistAllowed
+                  ? 'flex-1 cursor-not-allowed rounded-md border border-slate-100 bg-slate-100 px-3 py-2 text-xs text-slate-400'
+                  : role === 'specialist'
+                    ? 'flex-1 rounded-md bg-sky-600 px-3 py-2 font-medium text-white'
+                    : 'flex-1 rounded-md border border-slate-200 px-3 py-2 text-slate-700'
               }
             >
               Специалист
             </button>
           </div>
+          {!specialistAllowed && (
+            <p className="mt-1 text-[11px] text-slate-500">
+              Роль специалиста — только с почты, выданной администратором.
+            </p>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-xs text-slate-600">

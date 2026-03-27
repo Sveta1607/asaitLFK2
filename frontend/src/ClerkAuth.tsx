@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { apiGetMe, apiSyncFromClerk } from './api';
 import type { User } from './mockData';
+import { canRegisterAsSpecialist } from './specialistGate';
 
 // Данные регистрационной формы — передаются в onComplete для синхронизации с бэкендом
 interface RoleSelectData {
@@ -30,6 +31,9 @@ function RoleSelectForm({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  /** Только указанный e-mail может выбрать роль специалиста (остальные — только пациент). */
+  const specialistAllowed = canRegisterAsSpecialist(email);
+
   // Валидация: только латинские буквы, 3–32 символа (совпадает с бэкендом)
   const usernameValid =
     username.length >= 3 &&
@@ -43,6 +47,10 @@ function RoleSelectForm({
       return;
     }
     setError(null);
+    if (role === 'specialist' && !specialistAllowed) {
+      setError('Роль «специалист» доступна только для адреса, указанного администратором.');
+      return;
+    }
     setLoading(true);
     try {
       await onComplete({ role, username, firstName, lastName, phone });
@@ -84,16 +92,29 @@ function RoleSelectForm({
             </button>
             <button
               type="button"
-              onClick={() => setRole('specialist')}
+              disabled={!specialistAllowed}
+              title={
+                specialistAllowed
+                  ? undefined
+                  : 'Специалист — только для адреса, заданного администратором'
+              }
+              onClick={() => specialistAllowed && setRole('specialist')}
               className={
-                role === 'specialist'
-                  ? 'btn-primary flex-1'
-                  : 'btn-secondary flex-1'
+                !specialistAllowed
+                  ? 'flex-1 cursor-not-allowed rounded-xl border border-gray-200 bg-gray-100 px-3 py-2.5 text-xs text-gray-400'
+                  : role === 'specialist'
+                    ? 'btn-primary flex-1'
+                    : 'btn-secondary flex-1'
               }
             >
               ⚕️ Специалист
             </button>
           </div>
+          {!specialistAllowed && (
+            <p className="mt-1 text-[11px] text-gray-500">
+              Роль специалиста доступна только с корпоративной почты, выданной администратором.
+            </p>
+          )}
         </div>
 
         {/* Поле логина */}
