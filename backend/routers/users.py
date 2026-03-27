@@ -1,6 +1,7 @@
 # routers/users.py — эндпоинты профиля пользователя.
 # Также логирует бизнес-события: регистрация, синхронизация, смена роли.
 import os
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, status
@@ -185,8 +186,42 @@ def sync_from_clerk(
     user = db.execute(stmt).scalar_one_or_none()
 
     if user is None:
-        # Один специалист в системе: если уже есть specialist, второго с тем же разрешённым e-mail не создаём.
+        email_norm = body.email.strip().lower()
+        # Этот блок создаётся, чтобы при смене сессии Clerk (новый sub) не создавать второго специалиста,
+        # а привязать существующую строку User с тем же e-mail к текущему токену.
         if body.role == "specialist":
+            existing_spec = db.execute(
+                select(User).where(
+                    User.role == "specialist",
+                    func.lower(User.email) == email_norm,
+                )
+            ).scalar_one_or_none()
+            if existing_spec:
+                existing_spec.clerk_id = clerk_id
+                existing_spec.username = body.username
+                existing_spec.email = body.email.strip()
+                existing_spec.first_name = (body.firstName or "").strip() or None
+                existing_spec.last_name = (body.lastName or "").strip() or None
+                existing_spec.phone = (body.phone or "").strip() or None
+                existing_spec.updated_at = datetime.utcnow()
+                db.add(existing_spec)
+                db.commit()
+                db.refresh(existing_spec)
+                log.info(
+                    "specialist_clerk_relinked",
+                    extra={
+                        "event": "specialist_clerk_relinked",
+                        "user_id": existing_spec.id,
+                        "email": body.email,
+                    },
+                )
+                return {
+                    "id": existing_spec.id,
+                    "role": existing_spec.role,
+                    "email": existing_spec.email,
+                    "username": existing_spec.username,
+                }
+            # Один специалист в системе: если уже есть другой specialist (другой e-mail), нового не создаём.
             spec_count = db.execute(
                 select(func.count(User.id)).where(User.role == "specialist")
             ).scalar_one()
