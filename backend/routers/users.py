@@ -85,40 +85,90 @@ class ClerkSyncRequest(BaseModel):
         return v
 
 
+def _payload_email_norm(payload: dict) -> str:
+    """
+    Достаёт e-mail из JWT Clerk: поле в разных шаблонах сессии может называться по-разному.
+    """
+    if not isinstance(payload, dict):
+        return ""
+    for key in ("email", "email_address"):
+        v = payload.get(key)
+        if isinstance(v, str) and v.strip():
+            return v.strip().lower()
+    em = payload.get("email_addresses")
+    if isinstance(em, list) and em:
+        first = em[0]
+        if isinstance(first, dict):
+            e = first.get("email_address") or first.get("email")
+            if isinstance(e, str) and e.strip():
+                return e.strip().lower()
+    u = payload.get("user")
+    if isinstance(u, dict):
+        e = u.get("email")
+        if isinstance(e, str) and e.strip():
+            return e.strip().lower()
+    return ""
+
+
+def _jwt_email_matches_body_or_unset(payload: dict, email_norm: str) -> bool:
+    """
+    Проверяет, что e-mail из JWT совпадает с телом запроса (если в токене e-mail есть).
+    Если в токене поля нет — доверяем телу (некоторые режимы Clerk/отладки).
+    """
+    jwt_em = _payload_email_norm(payload)
+    if not jwt_em:
+        return True
+    return jwt_em == email_norm
+
+
+def _relink_user_by_email_row(
+    db: Session,
+    existing: User,
+    clerk_id: str,
+    body: ClerkSyncRequest,
+) -> dict:
+    """
+    Перепривязывает существующую строку User к новому Clerk sub при совпадении e-mail.
+    Нужна, чтобы при новом браузере/сессии не создавать дубликат и не ловить UNIQUE(email).
+    Роль «специалист» повышаем только при разрешённом адресе; понижать роль нельзя.
+    """
+    existing.clerk_id = clerk_id
+    existing.username = body.username
+    existing.email = body.email.strip()
+    existing.first_name = (body.firstName or "").strip() or None
+    existing.last_name = (body.lastName or "").strip() or None
+    existing.phone = (body.phone or "").strip() or None
+    email_norm = body.email.strip().lower()
+    if body.role == "specialist" and email_norm == _allowed_specialist_email_norm():
+        existing.role = "specialist"
+    existing.updated_at = datetime.utcnow()
+    db.add(existing)
+    db.commit()
+    db.refresh(existing)
+    log.info(
+        "user_clerk_relinked",
+        extra={
+            "event": "user_clerk_relinked",
+            "user_id": existing.id,
+            "email": body.email,
+        },
+    )
+    return {
+        "id": existing.id,
+        "role": existing.role,
+        "email": existing.email,
+        "username": existing.username,
+    }
+
+
 def _relink_specialist_row(
     db: Session,
     existing_spec: User,
     clerk_id: str,
     body: ClerkSyncRequest,
 ) -> dict:
-    """
-    Обновляет существующую строку специалиста под текущий Clerk sub и данные формы.
-    Вынесено, чтобы не дублировать логику при поиске по e-mail, по логину или единственной записи.
-    """
-    existing_spec.clerk_id = clerk_id
-    existing_spec.username = body.username
-    existing_spec.email = body.email.strip()
-    existing_spec.first_name = (body.firstName or "").strip() or None
-    existing_spec.last_name = (body.lastName or "").strip() or None
-    existing_spec.phone = (body.phone or "").strip() or None
-    existing_spec.updated_at = datetime.utcnow()
-    db.add(existing_spec)
-    db.commit()
-    db.refresh(existing_spec)
-    log.info(
-        "specialist_clerk_relinked",
-        extra={
-            "event": "specialist_clerk_relinked",
-            "user_id": existing_spec.id,
-            "email": body.email,
-        },
-    )
-    return {
-        "id": existing_spec.id,
-        "role": existing_spec.role,
-        "email": existing_spec.email,
-        "username": existing_spec.username,
-    }
+    """Делегирует общей перепривязке (та же логика полей и роли, что и для пациента по e-mail)."""
+    return _relink_user_by_email_row(db, existing_spec, clerk_id, body)
 
 
 @router.get("/me", response_model=UserResponse)
@@ -225,18 +275,19 @@ def sync_from_clerk(
     if user is None:
         email_norm = body.email.strip().lower()
         allowed_norm = _allowed_specialist_email_norm()
-        # Ниже три способа перепривязать существующего специалиста к новому Clerk sub без второй записи в БД.
-        if body.role == "specialist":
-            # 1) Совпадение e-mail в БД с e-mail из Clerk (без учёта регистра).
-            existing_spec = db.execute(
-                select(User).where(
-                    User.role == "specialist",
-                    func.lower(User.email) == email_norm,
-                )
+        # Этот блок создаётся, чтобы при том же e-mail и новом Clerk sub (другой браузер/аккаунт) не создавать второго пользователя и не ловить ошибку уникальности e-mail («уже зарегистрирован»).
+        # Для единственного разрешённого специалиста допускаем перепривязку по телу запроса, даже если claim email в JWT не совпадает (шаблон токена в Clerk без поля email или устаревший).
+        jwt_ok = _jwt_email_matches_body_or_unset(payload, email_norm)
+        specialist_allowlist_bypass = body.role == "specialist" and email_norm == allowed_norm
+        if jwt_ok or specialist_allowlist_bypass:
+            existing_by_email = db.execute(
+                select(User).where(func.lower(User.email) == email_norm)
             ).scalar_one_or_none()
-            if existing_spec:
-                return _relink_specialist_row(db, existing_spec, clerk_id, body)
-            # 2) Совпадение логина с записью специалиста при разрешённом адресе sharunkina2014@yandex.ru (и аналогах из .env).
+            if existing_by_email:
+                return _relink_user_by_email_row(db, existing_by_email, clerk_id, body)
+        # Ниже — случаи специалиста, когда в БД e-mail отличается от Clerk; для пациента новая регистрация идёт дальше к INSERT.
+        if body.role == "specialist":
+            # 1) Совпадение логина с записью специалиста при разрешённом адресе sharunkina2014@yandex.ru (и аналогах из .env).
             if email_norm == allowed_norm:
                 existing_spec = db.execute(
                     select(User).where(
@@ -246,7 +297,7 @@ def sync_from_clerk(
                 ).scalar_one_or_none()
                 if existing_spec:
                     return _relink_specialist_row(db, existing_spec, clerk_id, body)
-            # 3) В БД ровно один специалист и в Clerk — тот же разрешённый e-mail: перепривязка даже при расхождении полей в старой строке.
+            # 2) В БД ровно один специалист и в Clerk — тот же разрешённый e-mail: перепривязка даже при расхождении полей в старой строке.
             spec_rows = db.execute(select(User).where(User.role == "specialist")).scalars().all()
             if len(spec_rows) == 1 and email_norm == allowed_norm:
                 return _relink_specialist_row(db, spec_rows[0], clerk_id, body)
