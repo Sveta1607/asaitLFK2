@@ -1,20 +1,47 @@
-# .dockerignore в корне — используется при сборке backend И frontend на Amvera.
-# ВАЖНО: frontend/ НЕ исключаем — проект front использует Dockerfile.frontend с COPY frontend/.
-# Исключение frontend/ приводило к тому, что на Amvera собирался старый/пустой дизайн.
+# Контекст сборки — корень репозитория (типичный случай backend/Dockerfile и Dockerfile.frontend на Amvera).
+# Исключаем тяжёлое и ненужное: иначе демону Docker уходит гигабайт node_modules → сборка 5–15+ минут.
 
 # Git и служебные папки.
 .git/
 .gitignore
 .cursor/
+.idea/
+.vscode/
 
-# Python-кэш — не должен попадать в образ (собирается под другую версию Python).
+# Python-кэш и локальные venv — в образе не используются.
 **/__pycache__/
 **/*.pyc
 **/*.pyo
+**/.venv/
+**/venv/
 
-# Документация и конфиги, не нужные в образе.
+# Зависимости и сборка фронта: в контейнере ставятся через npm ci / npm run build.
+frontend/node_modules/
+frontend/dist/
+
+# Зависимости телеграм-бота (если репо целиком в контексте).
+telegram-bot/node_modules/
+
+# Дубликат исходников в корне (если есть).
+src/node_modules/
+src/dist/
+
+# Локальные БД и секреты — не в образ.
+*.db
+**/*.sqlite
+*.log
+.env
+**/.env
+**/.env.*
+
+# Документация и локальная оркестрация.
 *.md
 docker-compose.yml
 
-# Конфиг Amvera для фронта (у backend свой amvera.yaml в корне).
-frontend/amvera.yaml
+# Кэши тестов.
+**/coverage/
+**/.pytest_cache/
+**/.mypy_cache/
+
+# ВАЖНО: папки frontend/, backend/, telegram-bot/ как каталоги НЕ исключаем —
+# Dockerfile копирует нужные файлы; исключаем только перечисленное выше внутри них.

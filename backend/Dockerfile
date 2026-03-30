@@ -8,7 +8,8 @@ WORKDIR /app
 # Этот блок создаётся, чтобы Amvera могла собрать образ при контексте = корень репо.
 # Контекст сборки на Amvera — корень репозитория, поэтому пути относительно него.
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# prefer-binary — быстрее ставит колёса (psycopg и др.), меньше компиляции на слабом билдере Amvera.
+RUN pip install --no-cache-dir --prefer-binary -r requirements.txt
 
 # Этот блок создаётся, чтобы прервать сборку сразу, если критичные модули не установились.
 RUN python -c "import jwt, requests, jwcrypto; print('deps ok')"
