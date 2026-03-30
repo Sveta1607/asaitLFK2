@@ -11,6 +11,7 @@ from auth_deps import RequireUser, RequireSpecialist
 from db import get_db
 from db_models import Slot, Booking
 from logger import get_logger
+from telegram_notify import notify_specialist_new_booking
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 log = get_logger()
@@ -176,6 +177,19 @@ def create_booking(
         "time": booking.time,
         "created_by": "patient" if is_patient else "specialist",
     })
+    # Этот блок создаётся, чтобы уведомить специалиста в Telegram только при записи пациента с сайта (не при ручной записи врачом).
+    if is_patient:
+        notify_specialist_new_booking(
+            db,
+            specialist_id=booking.specialist_id,
+            first_name=booking.first_name,
+            last_name=booking.last_name,
+            phone=booking.phone,
+            date=booking.date,
+            time=booking.time,
+            booking_id=booking.id,
+            source_label="Сайт",
+        )
     return {
         "id": booking.id,
         "specialistId": booking.specialist_id,

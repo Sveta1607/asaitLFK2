@@ -5,7 +5,7 @@
  */
 
 import { Telegraf, Markup } from "telegraf";
-import { createBooking, fetchSlots, fetchSpecialists } from "./api.js";
+import { createBooking, fetchSlots, fetchSpecialists, linkTelegramChat } from "./api.js";
 import { emptyDraft, getSession, resetSession, State } from "./sessionStore.js";
 
 function formatDateRu(yyyyMmDd) {
@@ -98,6 +98,27 @@ export function createBot(token, api) {
   // Блок: /start — загрузка специалистов с сервера и выбор
   bot.start(async (ctx) => {
     const uid = ctx.from.id;
+    // Этот блок создаётся, чтобы обработать привязку уведомлений для специалиста (ссылка из ЛК на сайте).
+    const startPayload = (ctx.startPayload || "").trim();
+    if (startPayload.startsWith("link_")) {
+      const token = startPayload.slice("link_".length).trim();
+      if (!/^[a-fA-F0-9]{32}$/.test(token)) {
+        await ctx.reply(
+          "Неверный формат ссылки. Откройте профиль на сайте и сгенерируйте новую ссылку для Telegram.",
+        );
+        return;
+      }
+      try {
+        await linkTelegramChat(apiBaseUrl, apiSecret, token, ctx.chat.id);
+        await ctx.reply(
+          "Уведомления о новых записях подключены. Вы будете получать сюда ФИО, телефон, дату и время при записи пациента.",
+        );
+      } catch (e) {
+        await ctx.reply(`Не удалось подключить уведомления: ${e.message}`);
+      }
+      return;
+    }
+
     let specialists;
     try {
       specialists = await fetchSpecialists(apiBaseUrl, apiSecret);

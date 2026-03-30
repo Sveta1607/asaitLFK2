@@ -1,19 +1,21 @@
 # routers/users.py — эндпоинты профиля пользователя.
 # Также логирует бизнес-события: регистрация, синхронизация, смена роли.
 import os
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from auth_deps import RequireSuperuser, RequireUser, get_clerk_payload
+from auth_deps import RequireSuperuser, RequireSpecialist, RequireUser, get_clerk_payload
 from db import get_db
-from db_models import User
+from db_models import TelegramLinkToken, User
 from models import UserUpdateRequest, UserResponse, SpecialistPublicResponse
 from logger import get_logger
+from telegram_notify import resolve_telegram_bot_username
 
 router = APIRouter(prefix="/users", tags=["users"])
 log = get_logger()
@@ -191,7 +193,44 @@ def get_me(current_user: RequireUser, db: Session = Depends(get_db)):
         firstName=user.first_name,
         lastName=user.last_name,
         phone=user.phone,
+        telegramLinked=bool(user.telegram_chat_id) if user.role == "specialist" else False,
     )
+
+
+@router.post("/me/telegram-link", status_code=status.HTTP_200_OK)
+def create_telegram_link_for_specialist(
+    current_user: RequireSpecialist,
+    db: Session = Depends(get_db),
+):
+    """
+    Этот обработчик создаётся, чтобы:
+    - выдать специалисту короткую ссылку t.me/bot?start=link_<токен> (лимит Telegram на параметр start);
+    - одноразовый токен хранится в БД до привязки или истечения срока.
+    """
+    bot_username = resolve_telegram_bot_username()
+    if not bot_username:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "detail": "Задайте на сервере TELEGRAM_BOT_TOKEN или TELEGRAM_BOT_USERNAME (имя без @, символ @ в значении допускается).",
+                "code": "TELEGRAM_BOT_USERNAME_MISSING",
+            },
+        )
+    stmt = select(User).where(User.id == current_user.id)
+    user = db.execute(stmt).scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail={"detail": "Пользователь не найден.", "code": "USER_NOT_FOUND"},
+        )
+    # Этот блок создаётся, чтобы не копить старые неиспользованные ссылки при повторном запросе.
+    db.execute(delete(TelegramLinkToken).where(TelegramLinkToken.user_id == user.id))
+    token = secrets.token_hex(16)
+    expires_at = datetime.utcnow() + timedelta(minutes=30)
+    db.add(TelegramLinkToken(token=token, user_id=user.id, expires_at=expires_at))
+    db.commit()
+    url = f"https://t.me/{bot_username}?start=link_{token}"
+    return {"url": url}
 
 
 @router.patch("/me", response_model=UserResponse)
@@ -225,6 +264,7 @@ def update_me(body: UserUpdateRequest, current_user: RequireUser, db: Session = 
         firstName=user.first_name,
         lastName=user.last_name,
         phone=user.phone,
+        telegramLinked=bool(user.telegram_chat_id) if user.role == "specialist" else False,
     )
 
 
@@ -376,6 +416,7 @@ def list_users_admin(admin: RequireSuperuser, db: Session = Depends(get_db)):
             firstName=u.first_name,
             lastName=u.last_name,
             phone=u.phone,
+            telegramLinked=bool(u.telegram_chat_id) if u.role == "specialist" else False,
         )
         for u in users
     ]
@@ -439,4 +480,5 @@ def change_user_role(
         firstName=user.first_name,
         lastName=user.last_name,
         phone=user.phone,
+        telegramLinked=bool(user.telegram_chat_id) if user.role == "specialist" else False,
     )

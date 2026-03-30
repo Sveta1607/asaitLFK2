@@ -12,6 +12,8 @@ export type User = {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  /** Приходит с бэкенда для специалиста: привязан ли Telegram для уведомлений о записях */
+  telegramLinked?: boolean;
 };
 
 // Краткая информация о специалисте — для карточек выбора на странице записи

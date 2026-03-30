@@ -57,6 +57,8 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     # Это поле создаётся, чтобы хранить дату последнего обновления записи пользователя.
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    # Это поле создаётся, чтобы слать специалисту личные уведомления в Telegram (chat.id после привязки).
+    telegram_chat_id = Column(String, nullable=True, index=True)
 
     # Это отношение создаётся, чтобы получть список новостей, опубликованных специалистом.
     news_items = relationship("News", back_populates="specialist", cascade="all, delete-orphan")
@@ -74,6 +76,25 @@ class User(Base):
         back_populates="specialist",
         foreign_keys="Booking.specialist_id",
     )
+
+
+class TelegramLinkToken(Base):
+    """
+    Эта модель создаётся, чтобы:
+    - выдавать короткий одноразовый код в deep link Telegram (лимит ~64 символа на параметр start);
+    - привязать chat_id к профилю специалиста без длинного JWT в URL.
+    """
+
+    __tablename__ = "telegram_link_tokens"
+
+    # Это поле создаётся, чтобы передавать в t.me/bot?start=link_<token> укладываясь в лимит Telegram.
+    token = Column(String(32), primary_key=True, index=True)
+    # Это поле создаётся, чтобы знать, какому специалисту принадлежит привязка после верификации в боте.
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Это поле создаётся, чтобы отклонять просроченные ссылки привязки.
+    expires_at = Column(DateTime, nullable=False)
+    # Это поле создаётся, чтобы фиксировать момент выдачи ссылки (отладка и аудит).
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class News(Base):

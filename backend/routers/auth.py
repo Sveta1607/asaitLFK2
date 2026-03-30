@@ -83,6 +83,7 @@ def _auth_impl(data: dict, db: Session) -> UserResponse:
             firstName=existing.first_name,
             lastName=existing.last_name,
             phone=existing.phone,
+            telegramLinked=bool(existing.telegram_chat_id) if existing.role == "specialist" else False,
         )
 
     # Генерация нового идентификатора в формате, совместимом с фронтендом.
@@ -111,4 +112,5 @@ def _auth_impl(data: dict, db: Session) -> UserResponse:
         firstName=new_user.first_name,
         lastName=new_user.last_name,
         phone=new_user.phone,
+        telegramLinked=bool(new_user.telegram_chat_id) if new_user.role == "specialist" else False,
     )

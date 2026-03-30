@@ -92,9 +92,26 @@ def _ensure_sqlite_users_columns() -> None:
             alter_statements.append("ALTER TABLE users ADD COLUMN created_at DATETIME")
         if "updated_at" not in existing_columns:
             alter_statements.append("ALTER TABLE users ADD COLUMN updated_at DATETIME")
+        if "telegram_chat_id" not in existing_columns:
+            alter_statements.append("ALTER TABLE users ADD COLUMN telegram_chat_id TEXT")
 
         for statement in alter_statements:
             conn.execute(text(statement))
+
+
+def _ensure_postgres_users_telegram_chat_id() -> None:
+    """
+    Этот хелпер создаётся, чтобы:
+    - добавить колонку telegram_chat_id в PostgreSQL на существующих инсталляциях;
+    - не требовать отдельного Alembic при простом расширении схемы.
+    """
+    # Этот блок создаётся, чтобы выполнять только для PostgreSQL (SQLite обновляется через PRAGMA выше).
+    if not str(engine.url).startswith("postgresql"):
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR")
+        )
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -133,6 +150,7 @@ def init_db() -> None:
     try:
         Base.metadata.create_all(bind=engine)
         _ensure_sqlite_users_columns()
+        _ensure_postgres_users_telegram_chat_id()
     except OperationalError as exc:
         db_url = os.getenv("DATABASE_URL", "")
         is_local_postgres = (
@@ -154,6 +172,7 @@ def init_db() -> None:
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
         Base.metadata.create_all(bind=engine)
         _ensure_sqlite_users_columns()
+        _ensure_postgres_users_telegram_chat_id()
 
     # Добавляем начальные данные один раз.
     with SessionLocal() as session:

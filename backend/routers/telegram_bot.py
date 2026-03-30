@@ -1,4 +1,5 @@
 # routers/telegram_bot.py — чтение специалистов/слотов и создание записи для Telegram-бота (секрет в заголовке).
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,10 +9,11 @@ from sqlalchemy.orm import Session
 
 from auth_deps import require_telegram_bot_secret
 from db import get_db
-from db_models import Booking, Slot, User
+from db_models import Booking, Slot, TelegramLinkToken, User
 from logger import get_logger
 from models import SlotResponse, SpecialistPublicResponse
 from routers.bookings import _generate_cancel_token, _next_booking_id
+from telegram_notify import notify_specialist_new_booking
 
 router = APIRouter(prefix="/telegram", tags=["telegram-bot"])
 log = get_logger()
@@ -24,6 +26,58 @@ class TelegramBookingCreate(BaseModel):
     firstName: str = Field(..., min_length=1)
     lastName: str = Field(..., min_length=1)
     phone: Optional[str] = None
+
+
+class TelegramLinkChatBody(BaseModel):
+    """Тело запроса: привязка chat_id специалиста после перехода по ссылке из ЛК."""
+
+    token: str = Field(..., min_length=32, max_length=32, description="Одноразовый hex-токен из deep link")
+    chatId: str = Field(..., min_length=1, description="Идентификатор чата Telegram (личка с ботом)")
+
+
+@router.post("/link-chat", status_code=status.HTTP_200_OK)
+def telegram_link_specialist_chat(
+    body: TelegramLinkChatBody,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_telegram_bot_secret),
+):
+    """
+    Этот обработчик создаётся, чтобы:
+    - после /start link_<token> в боте сохранить telegram_chat_id у специалиста;
+    - принимать только валидный одноразовый токен из таблицы telegram_link_tokens.
+    """
+    raw_token = body.token.strip()
+    now = datetime.utcnow()
+    row = db.get(TelegramLinkToken, raw_token)
+    if not row:
+        raise HTTPException(
+            status_code=400,
+            detail={"detail": "Ссылка недействительна или уже использована.", "code": "INVALID_LINK_TOKEN"},
+        )
+    if row.expires_at < now:
+        db.delete(row)
+        db.commit()
+        raise HTTPException(
+            status_code=400,
+            detail={"detail": "Ссылка истекла. Создайте новую в профиле на сайте.", "code": "LINK_EXPIRED"},
+        )
+    user = db.get(User, row.user_id)
+    if not user or user.role != "specialist" or not user.approved:
+        db.delete(row)
+        db.commit()
+        raise HTTPException(
+            status_code=403,
+            detail={"detail": "Привязка доступна только одобренному специалисту.", "code": "FORBIDDEN"},
+        )
+    user.telegram_chat_id = str(body.chatId).strip()
+    db.delete(row)
+    db.add(user)
+    db.commit()
+    log.info(
+        "telegram_specialist_chat_linked",
+        extra={"event": "telegram_chat_linked", "user_id": user.id},
+    )
+    return {"ok": True}
 
 
 @router.get("/specialists", response_model=list[SpecialistPublicResponse])
@@ -135,6 +189,18 @@ def create_booking_from_telegram(
             "date": booking.date,
             "time": booking.time,
         },
+    )
+    # Этот блок создаётся, чтобы специалист получил то же оповещение, что и при записи с сайта (источник — Telegram).
+    notify_specialist_new_booking(
+        db,
+        specialist_id=booking.specialist_id,
+        first_name=booking.first_name,
+        last_name=booking.last_name,
+        phone=booking.phone,
+        date=booking.date,
+        time=booking.time,
+        booking_id=booking.id,
+        source_label="Telegram",
     )
     return {
         "id": booking.id,

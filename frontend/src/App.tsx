@@ -19,6 +19,7 @@ import {
   apiUpdateNews,
   apiDeleteNews,
   apiUpdateUser,
+  apiRequestTelegramLink,
 } from './api';
 import { useClerkAuth, RoleSelectForm } from './ClerkAuth';
 import type { Booking, HomeContent, NewsItem, SpecialistInfo, TimeSlot, User } from './mockData';
@@ -441,6 +442,10 @@ const ProfilePage: React.FC<{
   const [phone, setPhone] = useState(currentUser.phone || '+7');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // Состояние блока привязки Telegram для специалиста: ссылка из API и отдельные ошибки/загрузка
+  const [tgLinkUrl, setTgLinkUrl] = useState<string | null>(null);
+  const [tgError, setTgError] = useState<string | null>(null);
+  const [tgLoading, setTgLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -464,6 +469,21 @@ const ProfilePage: React.FC<{
       setError(err instanceof Error ? err.message : 'Ошибка при сохранении');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRequestTelegramLink = async () => {
+    setTgError(null);
+    setTgLoading(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Нет токена авторизации');
+      const { url } = await apiRequestTelegramLink(token);
+      setTgLinkUrl(url);
+    } catch (err) {
+      setTgError(err instanceof Error ? err.message : 'Не удалось получить ссылку');
+    } finally {
+      setTgLoading(false);
     }
   };
 
@@ -545,6 +565,56 @@ const ProfilePage: React.FC<{
             {isLoading ? 'Сохранение...' : 'Сохранить изменения'}
           </button>
         </form>
+
+        {/* Блок для специалиста: подключение Telegram, чтобы получать оповещения о новых записях */}
+        {currentUser.role === 'specialist' && (
+          <div className="mt-6 border-t border-mint-100 pt-6">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-lg">📲</span>
+              <h2 className="text-sm font-bold text-gray-800">Уведомления в Telegram</h2>
+            </div>
+            <p className="mb-3 text-xs text-gray-500">
+              Получайте ФИО пациента, телефон, дату и время сразу после записи с сайта или через бота.
+            </p>
+            <div className="mb-3 rounded-xl border border-gray-100 bg-mint-50/50 px-3 py-2 text-xs font-semibold text-mint-800">
+              Статус:{' '}
+              {currentUser.telegramLinked ? 'подключено' : 'не подключено'}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <button
+                type="button"
+                className="btn-primary text-sm"
+                disabled={tgLoading}
+                onClick={handleRequestTelegramLink}
+              >
+                {tgLoading ? 'Загрузка…' : 'Получить ссылку для Telegram'}
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                onClick={() => onUpdateUser()}
+              >
+                Обновить статус
+              </button>
+            </div>
+            {tgLinkUrl && (
+              <div className="mt-3 rounded-xl border border-mint-200 bg-white p-3 text-xs">
+                <p className="mb-2 font-semibold text-gray-700">Откройте ссылку в Telegram (действует ~30 минут):</p>
+                <a
+                  href={tgLinkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="break-all text-mint-700 underline"
+                >
+                  {tgLinkUrl}
+                </a>
+              </div>
+            )}
+            {tgError && (
+              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{tgError}</p>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );

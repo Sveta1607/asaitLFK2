@@ -18,6 +18,8 @@ class UserResponse(BaseModel):
     firstName: Optional[str] = None
     lastName: Optional[str] = None
     phone: Optional[str] = None
+    # Это поле создаётся, чтобы показать в ЛК, привязан ли Telegram для уведомлений о записях (только для специалиста).
+    telegramLinked: bool = False
 
 
 # Публичная информация о специалисте — для страницы выбора записи пациентом

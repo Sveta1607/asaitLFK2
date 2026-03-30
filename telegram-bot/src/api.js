@@ -77,3 +77,14 @@ export function createBooking(apiBaseUrl, apiSecret, body) {
     body: JSON.stringify(body),
   });
 }
+
+/**
+ * Привязка личного чата специалиста к профилю после deep link ?start=link_<token>.
+ * Вызывается из обработчика /start, чтобы сервер записал telegram_chat_id у специалиста.
+ */
+export function linkTelegramChat(apiBaseUrl, apiSecret, token, chatId) {
+  return apiFetch(apiBaseUrl, apiSecret, "/api/telegram/link-chat", {
+    method: "POST",
+    body: JSON.stringify({ token, chatId: String(chatId) }),
+  });
+}
