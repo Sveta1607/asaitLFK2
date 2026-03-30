@@ -145,7 +145,9 @@ export async function apiAuth(
 
 // --- Users ---
 /** Запрос ссылки t.me/... для привязки Telegram-бота к профилю специалиста (уведомления о записях). */
-export async function apiRequestTelegramLink(token: string): Promise<{ url: string }> {
+export async function apiRequestTelegramLink(
+  token: string
+): Promise<{ url: string; linkMode?: 'signed' | 'database' }> {
   const res = await fetchApi(`${API_BASE}/users/me/telegram-link`, {
     method: 'POST',
     headers: headers(token),

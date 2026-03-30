@@ -15,6 +15,7 @@ from db import get_db
 from db_models import TelegramLinkToken, User
 from models import UserUpdateRequest, UserResponse, SpecialistPublicResponse
 from logger import get_logger
+from telegram_link_token import can_issue_signed_telegram_link_token, create_signed_telegram_link_token
 from telegram_notify import resolve_telegram_bot_username
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -205,7 +206,7 @@ def create_telegram_link_for_specialist(
     """
     Этот обработчик создаётся, чтобы:
     - выдать специалисту короткую ссылку t.me/bot?start=link_<токен> (лимит Telegram на параметр start);
-    - одноразовый токен хранится в БД до привязки или истечения срока.
+    - токен либо подписан (HMAC, без строки в БД — удобно при нескольких репликах SQLite), либо одноразовый hex в telegram_link_tokens.
     """
     bot_username, telegram_config_error = resolve_telegram_bot_username()
     if not bot_username:
@@ -232,12 +233,20 @@ def create_telegram_link_for_specialist(
             TelegramLinkToken.expires_at < datetime.utcnow(),
         )
     )
-    token = secrets.token_hex(16)
     expires_at = datetime.utcnow() + timedelta(minutes=30)
-    db.add(TelegramLinkToken(token=token, user_id=user.id, expires_at=expires_at))
-    db.commit()
+    # Подписанный токен не зависит от реплики БД (один секрет на всех инстансах — как у бота).
+    if can_issue_signed_telegram_link_token(user.id):
+        token = create_signed_telegram_link_token(user.id, expires_at)
+        link_mode = "signed"
+        db.commit()
+    else:
+        token = secrets.token_hex(16)
+        db.add(TelegramLinkToken(token=token, user_id=user.id, expires_at=expires_at))
+        link_mode = "database"
+        db.commit()
     url = f"https://t.me/{bot_username}?start=link_{token}"
-    return {"url": url}
+    # linkMode — чтобы в ЛК было видно: hex-ссылка требует того же API/БД, что и бот.
+    return {"url": url, "linkMode": link_mode}
 
 
 @router.patch("/me", response_model=UserResponse)

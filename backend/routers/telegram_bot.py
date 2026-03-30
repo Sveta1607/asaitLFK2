@@ -1,4 +1,5 @@
 # routers/telegram_bot.py — чтение специалистов/слотов и создание записи для Telegram-бота (секрет в заголовке).
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -13,6 +14,7 @@ from db_models import Booking, Slot, TelegramLinkToken, User
 from logger import get_logger
 from models import SlotResponse, SpecialistPublicResponse
 from routers.bookings import _generate_cancel_token, _next_booking_id
+from telegram_link_token import verify_signed_telegram_link_token
 from telegram_notify import notify_specialist_new_booking
 
 router = APIRouter(prefix="/telegram", tags=["telegram-bot"])
@@ -31,7 +33,12 @@ class TelegramBookingCreate(BaseModel):
 class TelegramLinkChatBody(BaseModel):
     """Тело запроса: привязка chat_id специалиста после перехода по ссылке из ЛК."""
 
-    token: str = Field(..., min_length=32, max_length=32, description="Одноразовый hex-токен из deep link")
+    token: str = Field(
+        ...,
+        min_length=12,
+        max_length=96,
+        description="Hex-токен из БД (32 символа) или подписанный токен из ссылки",
+    )
     chatId: str = Field(..., min_length=1, description="Идентификатор чата Telegram (личка с ботом)")
 
 
@@ -44,28 +51,67 @@ def telegram_link_specialist_chat(
     """
     Этот обработчик создаётся, чтобы:
     - после /start link_<token> в боте сохранить telegram_chat_id у специалиста;
-    - принимать только валидный одноразовый токен из таблицы telegram_link_tokens.
+    - принимать hex-токен из telegram_link_tokens или подписанный токен (без строки в БД).
     """
-    # Нормализация: в URL/клиентах токен иногда приходит в другом регистре; в БД всегда нижний регистр (token_hex).
-    raw_token = body.token.strip().lower()
+    raw_token = body.token.strip()
     now = datetime.utcnow()
-    row = db.get(TelegramLinkToken, raw_token)
+
+    # Этот блок создаётся, чтобы обработать подписанный токен: одинаковый секрет на всех репликах — не нужна общая БД для выдачи ссылки.
+    if not re.fullmatch(r"[a-fA-F0-9]{32}", raw_token):
+        signed = verify_signed_telegram_link_token(raw_token)
+        if signed:
+            user_id, exp_at = signed
+            if exp_at < now:
+                raise HTTPException(
+                    status_code=400,
+                    detail={"detail": "Ссылка истекла. Создайте новую в профиле на сайте.", "code": "LINK_EXPIRED"},
+                )
+            user = db.get(User, user_id)
+            if not user or user.role != "specialist" or not user.approved:
+                raise HTTPException(
+                    status_code=403,
+                    detail={"detail": "Привязка доступна только одобренному специалисту.", "code": "FORBIDDEN"},
+                )
+            user.telegram_chat_id = str(body.chatId).strip()
+            db.add(user)
+            db.commit()
+            log.info(
+                "telegram_specialist_chat_linked",
+                extra={"event": "telegram_chat_linked", "user_id": user.id, "via": "signed"},
+            )
+            return {"ok": True}
+
+    # Этот блок создаётся, чтобы поддержать старые одноразовые hex-токены в таблице telegram_link_tokens.
+    raw_hex = raw_token.lower()
+    row = db.get(TelegramLinkToken, raw_hex)
     if not row:
         log.warning(
             "telegram_link_token_missing",
             extra={
                 "event": "invalid_telegram_link_token",
-                "token_prefix": raw_token[:8] if len(raw_token) >= 8 else raw_token,
+                "token_prefix": raw_hex[:8] if len(raw_hex) >= 8 else raw_hex,
+                "looks_like_db_hex": bool(re.fullmatch(r"[a-f0-9]{32}", raw_hex)),
             },
         )
+        # Этот блок создаётся, чтобы явно подсказать типичную причину для 32-символьного hex (токен только в БД этого инстанса).
+        hex_db_hint = ""
+        if re.fullmatch(r"[a-f0-9]{32}", raw_hex):
+            hex_db_hint = (
+                " Токен из 32 символов (0–9, a–f) хранится только в базе того сервера, где нажали «Получить ссылку». "
+                "Если бот в telegram-bot/.env смотрит на другой хост (часто остаётся API_BASE_URL=http://127.0.0.1:3000 "
+                "при сайте на Amvera), в его базе строки нет → эта ошибка. Укажите в .env бота полный URL продакшен-API "
+                "и тот же TELEGRAM_BOT_API_SECRET, что в переменных бэкенда. На Amvera в контейнере бэкенда задайте "
+                "TELEGRAM_BOT_API_SECRET — тогда новые ссылки станут подписанными (не только hex) и переживут несколько реплик SQLite."
+            )
         raise HTTPException(
             status_code=400,
             detail={
                 "detail": "Ссылка недействительна или уже использована.",
                 "code": "INVALID_LINK_TOKEN",
                 "hint": "Проверьте: 1) не нажимали ли «Получить ссылку» повторно до открытия старой ссылки; "
-                "2) процесс бота (API_BASE_URL) смотрит на тот же сервер API и ту же БД, что и сайт; "
-                "3) при нескольких репликах бэкенда с SQLite токен может оказаться на другом инстансе — используйте один под или PostgreSQL.",
+                "2) в telegram-bot/.env задан тот же TELEGRAM_BOT_API_SECRET, что на бэкенде, и верный API_BASE_URL; "
+                "3) при старых ссылках (только hex) и SQLite на нескольких подах — включите подписанные ссылки (секрет на бэкенде) и запросите ссылку заново."
+                + hex_db_hint,
             },
         )
     if row.expires_at < now:
@@ -89,7 +135,7 @@ def telegram_link_specialist_chat(
     db.commit()
     log.info(
         "telegram_specialist_chat_linked",
-        extra={"event": "telegram_chat_linked", "user_id": user.id},
+        extra={"event": "telegram_chat_linked", "user_id": user.id, "via": "db_row"},
     )
     return {"ok": True}
 

@@ -464,6 +464,8 @@ const ProfilePage: React.FC<{
   const [isLoading, setIsLoading] = useState(false);
   // Состояние блока привязки Telegram для специалиста: ссылка из API и отдельные ошибки/загрузка
   const [tgLinkUrl, setTgLinkUrl] = useState<string | null>(null);
+  // Режим ссылки с бэкенда: database — токен только в БД этого API; signed — подпись, одинаковая на всех репликах.
+  const [tgLinkMode, setTgLinkMode] = useState<'signed' | 'database' | null>(null);
   const [tgError, setTgError] = useState<string | null>(null);
   const [tgLoading, setTgLoading] = useState(false);
   // Этот блок создаётся, чтобы один раз разобрать ссылку t.me и показать обход блокировки в браузере.
@@ -500,8 +502,9 @@ const ProfilePage: React.FC<{
     try {
       const token = await getToken();
       if (!token) throw new Error('Нет токена авторизации');
-      const { url } = await apiRequestTelegramLink(token);
-      setTgLinkUrl(url);
+      const data = await apiRequestTelegramLink(token);
+      setTgLinkUrl(data.url);
+      setTgLinkMode(data.linkMode === 'database' || data.linkMode === 'signed' ? data.linkMode : null);
     } catch (err) {
       setTgError(err instanceof Error ? err.message : 'Не удалось получить ссылку');
     } finally {
@@ -630,6 +633,18 @@ const ProfilePage: React.FC<{
                 >
                   {tgLinkUrl}
                 </a>
+                {/* Блок создаётся, чтобы предупредить: hex-токен в ссылке существует только в БД того API, куда ходит сайт — бот должен звать тот же URL. */}
+                {tgLinkMode === 'database' && (
+                  <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50/80 px-2 py-2 text-[11px] leading-relaxed text-amber-950">
+                    Ссылка с длинным кодом из букв и цифр (32 символа после link_) записана в базу{' '}
+                    <strong>этого</strong> сервера. Процесс Telegram-бота обязан вызывать{' '}
+                    <strong>тот же</strong> адрес API, что и сайт (в <code className="rounded bg-white/80 px-0.5">telegram-bot/.env</code>{' '}
+                    — <code className="rounded bg-white/80 px-0.5">API_BASE_URL</code>, не localhost, если сайт на хостинге), и тот же{' '}
+                    <code className="rounded bg-white/80 px-0.5">TELEGRAM_BOT_API_SECRET</code>, что у бэкенда. Иначе в чате бота будет
+                    «ссылка недействительна». На бэкенде задайте <code className="rounded bg-white/80 px-0.5">TELEGRAM_BOT_API_SECRET</code>{' '}
+                    — тогда новые ссылки станут короче (подпись) и не зависят от реплик БД.
+                  </p>
+                )}
                 {/* Блок создаётся, чтобы объяснить ERR_CONNECTION_RESET на t.me и дать обход без браузера. */}
                 <p className="mt-3 rounded-lg bg-amber-50 px-2 py-2 text-[11px] leading-relaxed text-amber-900">
                   Если в браузере появляется «соединение сброшено» или сайт t.me не открывается — это часто

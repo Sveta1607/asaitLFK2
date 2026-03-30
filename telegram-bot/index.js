@@ -60,6 +60,15 @@ const { bot } = createBot(token, { apiBaseUrl, apiSecret });
 bot.launch().then(() => {
   console.log("Telegram-бот запущен (long polling)");
   console.log(`API: ${apiBaseUrl}`);
+  // Предупреждение: hex-токен привязки живёт в БД того API, куда ходит сайт; localhost ≠ Amvera.
+  const low = apiBaseUrl.toLowerCase();
+  if (low.includes("127.0.0.1") || low.includes("localhost")) {
+    console.warn(
+      "[telegram-bot] API_BASE_URL указывает на эту машину. Если ссылку «Получить ссылку» выдаёт сайт на хостинге, " +
+        "токен записан в БД на сервере, а бот ищет его здесь → в чате будет «ссылка недействительна». " +
+        "Поставьте URL продакшен-API (как у nginx proxy к бэкенду).",
+    );
+  }
 });
 
 process.once("SIGINT", () => bot.stop("SIGINT"));

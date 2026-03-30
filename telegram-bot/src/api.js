@@ -87,10 +87,11 @@ export function createBooking(apiBaseUrl, apiSecret, body) {
  * Вызывается из обработчика /start, чтобы сервер записал telegram_chat_id у специалиста.
  */
 export function linkTelegramChat(apiBaseUrl, apiSecret, token, chatId) {
-  // Приведение к нижнему регистру: на сервере токен хранится как от secrets.token_hex (a-f, 0-9).
-  const normalized = String(token || "").trim().toLowerCase();
+  // Hex-токен из БД — только a-f; подписанный токен (base64url) чувствителен к регистру.
+  const raw = String(token || "").trim();
+  const bodyToken = /^[a-fA-F0-9]{32}$/.test(raw) ? raw.toLowerCase() : raw;
   return apiFetch(apiBaseUrl, apiSecret, "/api/telegram/link-chat", {
     method: "POST",
-    body: JSON.stringify({ token: normalized, chatId: String(chatId) }),
+    body: JSON.stringify({ token: bodyToken, chatId: String(chatId) }),
   });
 }

@@ -88,6 +88,62 @@ function timesKeyboard(specialistId, date, slotsCache) {
 }
 
 /**
+ * Этот блок создаётся, чтобы убрать невидимые символы из аргумента /start (копипаст из браузера).
+ */
+function stripInvisible(s) {
+  return String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, "");
+}
+
+/**
+ * Этот блок создаётся, чтобы взять аргумент после /start или /start@Bot из текста сообщения (источник правды в Telegram).
+ */
+function extractStartArgumentFromMessageText(text) {
+  const t = stripInvisible(text || "").trim();
+  return t.replace(/^\/start(?:@[^\s]+)?\s*/i, "").trim();
+}
+
+/**
+ * Этот блок создаётся, чтобы извлечь токен для POST /api/telegram/link-chat: 32 hex (старый формат) или подписанная строка (регистр важен).
+ */
+function parseLinkTokenForApi(payload) {
+  const raw = stripInvisible(payload || "").trim();
+  if (!raw) return null;
+  let t = raw;
+  if (t.toLowerCase().startsWith("link_")) t = t.slice("link_".length).trim();
+  if (!t) return null;
+  if (/^[a-fA-F0-9]{32}$/.test(t)) return t.toLowerCase();
+  if (/^[A-Za-z0-9_-]+$/.test(t) && t.length >= 8 && t.length <= 96) return t;
+  return null;
+}
+
+/**
+ * Этот блок создаётся, чтобы для чистого /start не использовать ctx.startPayload — иначе после ошибки по deep link
+ * повторный /start без аргумента теоретически может унаследовать старый payload в middleware и снова вызвать привязку.
+ */
+function resolveStartLinkArgument(ctx) {
+  const fullText = stripInvisible(ctx.message?.text || "").trim();
+  const fromText = extractStartArgumentFromMessageText(fullText);
+  if (fromText) return fromText;
+  const onlyStart = /^\/start(?:@[A-Za-z0-9_]+)?$/i.test(fullText);
+  if (onlyStart) return "";
+  return stripInvisible((ctx.startPayload || "").trim());
+}
+
+/**
+ * Этот блок создаётся, чтобы один раз выполнить вызов API привязки и ответ пользователю.
+ */
+async function runTelegramSpecialistLink(ctx, apiBaseUrl, apiSecret, linkToken) {
+  try {
+    await linkTelegramChat(apiBaseUrl, apiSecret, linkToken, ctx.chat.id);
+    await ctx.reply(
+      "Уведомления о новых записях подключены. Вы будете получать сюда ФИО, телефон, дату и время при записи пациента.",
+    );
+  } catch (e) {
+    await ctx.reply(`Не удалось подключить уведомления: ${e.message}`);
+  }
+}
+
+/**
  * @param {string} token — TELEGRAM_BOT_TOKEN
  * @param {{ apiBaseUrl: string, apiSecret: string }} api — URL бэкенда и TELEGRAM_BOT_API_SECRET
  */
@@ -95,27 +151,33 @@ export function createBot(token, api) {
   const { apiBaseUrl, apiSecret } = api;
   const bot = new Telegraf(token);
 
+  // Блок: /link <токен> — ручная привязка, если deep link из браузера ведёт себя нестабильно.
+  bot.command("link", async (ctx) => {
+    const arg = stripInvisible((ctx.payload || "").trim());
+    const tok = parseLinkTokenForApi(arg);
+    if (!tok) {
+      await ctx.reply(
+        "Укажите хвост ссылки после link_: /link <токен> (32 символа 0-9 a-f или короткая подписанная строка с сайта).",
+      );
+      return;
+    }
+    await runTelegramSpecialistLink(ctx, apiBaseUrl, apiSecret, tok);
+  });
+
   // Блок: /start — загрузка специалистов с сервера и выбор
   bot.start(async (ctx) => {
     const uid = ctx.from.id;
     // Этот блок создаётся, чтобы обработать привязку уведомлений для специалиста (ссылка из ЛК на сайте).
-    const startPayload = (ctx.startPayload || "").trim();
-    if (startPayload.startsWith("link_")) {
-      const token = startPayload.slice("link_".length).trim();
-      if (!/^[a-fA-F0-9]{32}$/.test(token)) {
-        await ctx.reply(
-          "Неверный формат ссылки. Откройте профиль на сайте и сгенерируйте новую ссылку для Telegram.",
-        );
-        return;
-      }
-      try {
-        await linkTelegramChat(apiBaseUrl, apiSecret, token, ctx.chat.id);
-        await ctx.reply(
-          "Уведомления о новых записях подключены. Вы будете получать сюда ФИО, телефон, дату и время при записи пациента.",
-        );
-      } catch (e) {
-        await ctx.reply(`Не удалось подключить уведомления: ${e.message}`);
-      }
+    const startArg = resolveStartLinkArgument(ctx);
+    const linkTok = parseLinkTokenForApi(startArg);
+    if (linkTok) {
+      await runTelegramSpecialistLink(ctx, apiBaseUrl, apiSecret, linkTok);
+      return;
+    }
+    if (startArg && startArg.toLowerCase().startsWith("link_")) {
+      await ctx.reply(
+        "Неверный формат ссылки. Откройте профиль на сайте и сгенерируйте новую ссылку для Telegram.",
+      );
       return;
     }
 
