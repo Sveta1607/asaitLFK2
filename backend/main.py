@@ -78,9 +78,12 @@ _default_origins = [
 ]
 _cors_env = os.getenv("CORS_ORIGINS", "").strip()
 origins = _default_origins + [x.strip() for x in _cors_env.split(",") if x.strip()]
+# Этот regex создаётся, чтобы браузер не блокировал API, если фронт на другом поддомене *.amvera.io (не только front-svetlanagolovchanskaya).
+_amvera_origin_regex = r"https?://[a-zA-Z0-9.-]+\.amvera\.io$"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=_amvera_origin_regex,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
