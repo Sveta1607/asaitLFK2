@@ -9,5 +9,7 @@ build:
   dockerfile: Dockerfile
 
 # Этот блок создаётся, чтобы Amvera слушала порт 80 (Nginx внутри контейнера).
+# В nginx добавлен GET /health (только «ok», без прокси на бэкенд).
+# Если в панели Amvera в «пробах Kubernetes» указан путь вроде /api/... — замените на /health (порт 80).
 run:
   containerPort: 80
