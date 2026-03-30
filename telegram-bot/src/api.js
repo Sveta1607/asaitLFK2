@@ -52,6 +52,10 @@ async function apiFetch(apiBaseUrl, apiSecret, path, options = {}) {
         typeof d === "string"
           ? d
           : d?.detail ?? JSON.stringify(d);
+      // Подсказка с сервера (например, про повторный запрос ссылки или разные БД у бота и сайта).
+      if (typeof d === "object" && d?.hint) {
+        detail = `${detail} — ${d.hint}`;
+      }
     }
     throw new Error(`${r.status}: ${detail}`);
   }
@@ -83,8 +87,10 @@ export function createBooking(apiBaseUrl, apiSecret, body) {
  * Вызывается из обработчика /start, чтобы сервер записал telegram_chat_id у специалиста.
  */
 export function linkTelegramChat(apiBaseUrl, apiSecret, token, chatId) {
+  // Приведение к нижнему регистру: на сервере токен хранится как от secrets.token_hex (a-f, 0-9).
+  const normalized = String(token || "").trim().toLowerCase();
   return apiFetch(apiBaseUrl, apiSecret, "/api/telegram/link-chat", {
     method: "POST",
-    body: JSON.stringify({ token, chatId: String(chatId) }),
+    body: JSON.stringify({ token: normalized, chatId: String(chatId) }),
   });
 }

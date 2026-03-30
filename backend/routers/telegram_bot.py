@@ -46,13 +46,27 @@ def telegram_link_specialist_chat(
     - после /start link_<token> в боте сохранить telegram_chat_id у специалиста;
     - принимать только валидный одноразовый токен из таблицы telegram_link_tokens.
     """
-    raw_token = body.token.strip()
+    # Нормализация: в URL/клиентах токен иногда приходит в другом регистре; в БД всегда нижний регистр (token_hex).
+    raw_token = body.token.strip().lower()
     now = datetime.utcnow()
     row = db.get(TelegramLinkToken, raw_token)
     if not row:
+        log.warning(
+            "telegram_link_token_missing",
+            extra={
+                "event": "invalid_telegram_link_token",
+                "token_prefix": raw_token[:8] if len(raw_token) >= 8 else raw_token,
+            },
+        )
         raise HTTPException(
             status_code=400,
-            detail={"detail": "Ссылка недействительна или уже использована.", "code": "INVALID_LINK_TOKEN"},
+            detail={
+                "detail": "Ссылка недействительна или уже использована.",
+                "code": "INVALID_LINK_TOKEN",
+                "hint": "Проверьте: 1) не нажимали ли «Получить ссылку» повторно до открытия старой ссылки; "
+                "2) процесс бота (API_BASE_URL) смотрит на тот же сервер API и ту же БД, что и сайт; "
+                "3) при нескольких репликах бэкенда с SQLite токен может оказаться на другом инстансе — используйте один под или PostgreSQL.",
+            },
         )
     if row.expires_at < now:
         db.delete(row)

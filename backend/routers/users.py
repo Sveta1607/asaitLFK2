@@ -224,8 +224,14 @@ def create_telegram_link_for_specialist(
             status_code=404,
             detail={"detail": "Пользователь не найден.", "code": "USER_NOT_FOUND"},
         )
-    # Этот блок создаётся, чтобы не копить старые неиспользованные ссылки при повторном запросе.
-    db.execute(delete(TelegramLinkToken).where(TelegramLinkToken.user_id == user.id))
+    # Этот блок создаётся, чтобы убрать только просроченные токены; действующие ссылки не трогаем —
+    # иначе повторное нажатие «Получить ссылку» делает недействительной предыдущую, которую пользователь ещё не открыл в Telegram.
+    db.execute(
+        delete(TelegramLinkToken).where(
+            TelegramLinkToken.user_id == user.id,
+            TelegramLinkToken.expires_at < datetime.utcnow(),
+        )
+    )
     token = secrets.token_hex(16)
     expires_at = datetime.utcnow() + timedelta(minutes=30)
     db.add(TelegramLinkToken(token=token, user_id=user.id, expires_at=expires_at))

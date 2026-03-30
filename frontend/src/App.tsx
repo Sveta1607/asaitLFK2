@@ -415,6 +415,26 @@ const HomePage: React.FC<{
   );
 };
 
+/**
+ * Этот блок создаётся, чтобы из ссылки вида https://t.me/bot?start=link_… получить:
+ * - URI tg:// для открытия бота в приложении Telegram (без захода на t.me в браузере);
+ * - текст команды /start … для ручного ввода, если браузер или сеть блокируют t.me.
+ */
+function parseTelegramWebLink(url: string): { appUrl: string; startCommand: string; botUsername: string } | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname !== 't.me' && u.hostname !== 'telegram.me') return null;
+    const botUsername = u.pathname.replace(/^\//, '').split('/')[0];
+    const start = (u.searchParams.get('start') || '').trim();
+    if (!botUsername || !start.startsWith('link_')) return null;
+    const appUrl = `tg://resolve?domain=${encodeURIComponent(botUsername)}&start=${encodeURIComponent(start)}`;
+    const startCommand = `/start ${start}`;
+    return { appUrl, startCommand, botUsername };
+  } catch {
+    return null;
+  }
+}
+
 // Страница профиля — просмотр и редактирование данных пользователя
 const ProfilePage: React.FC<{
   currentUser: User | null;
@@ -446,6 +466,8 @@ const ProfilePage: React.FC<{
   const [tgLinkUrl, setTgLinkUrl] = useState<string | null>(null);
   const [tgError, setTgError] = useState<string | null>(null);
   const [tgLoading, setTgLoading] = useState(false);
+  // Этот блок создаётся, чтобы один раз разобрать ссылку t.me и показать обход блокировки в браузере.
+  const tgParsed = useMemo(() => (tgLinkUrl ? parseTelegramWebLink(tgLinkUrl) : null), [tgLinkUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -608,6 +630,34 @@ const ProfilePage: React.FC<{
                 >
                   {tgLinkUrl}
                 </a>
+                {/* Блок создаётся, чтобы объяснить ERR_CONNECTION_RESET на t.me и дать обход без браузера. */}
+                <p className="mt-3 rounded-lg bg-amber-50 px-2 py-2 text-[11px] leading-relaxed text-amber-900">
+                  Если в браузере появляется «соединение сброшено» или сайт t.me не открывается — это часто
+                  блокировка или фильтрация сети, а не ошибка сайта ЛФК. Ссылка уже сформирована верно (см. запрос
+                  telegram-link в инструментах разработчика).
+                </p>
+                {tgParsed && (
+                  <div className="mt-3 space-y-2 border-t border-mint-100 pt-3 text-[11px] text-gray-600">
+                    <p className="font-semibold text-gray-700">Как подключить без браузера:</p>
+                    <p>
+                      <a
+                        href={tgParsed.appUrl}
+                        className="font-semibold text-mint-700 underline"
+                      >
+                        Открыть в приложении Telegram
+                      </a>{' '}
+                      (если Telegram установлен на этом устройстве).
+                    </p>
+                    <p>
+                      Или в Telegram найдите бота{' '}
+                      <span className="font-mono font-semibold text-gray-800">@{tgParsed.botUsername}</span> и
+                      отправьте в чат одной строкой:
+                    </p>
+                    <code className="block break-all rounded bg-gray-100 px-2 py-1.5 text-[10px] text-gray-800">
+                      {tgParsed.startCommand}
+                    </code>
+                  </div>
+                )}
               </div>
             )}
             {tgError && (
