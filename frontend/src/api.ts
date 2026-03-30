@@ -5,9 +5,13 @@ import * as Sentry from '@sentry/react';
 
 const HOME_CONTENT_STORAGE_KEY = 'lfk-home-content-fallback';
 
-/** Приводит URL к виду …/api (роуты FastAPI под префиксом /api). */
+/** Приводит URL к виду …/api (роуты FastAPI под префиксом /api). Поддерживает относительный путь /api (Nginx на фронте). */
 function normalizeApiBase(raw: string): string {
   let u = (raw || '').trim().replace(/\/+$/, '');
+  // Этот блок: сборка с VITE_API_URL=/api — запросы идут на тот же хост, Nginx проксирует на бэкенд (без CORS).
+  if (u.startsWith('/')) {
+    return u.endsWith('/api') ? u : `${u.replace(/\/+$/, '')}/api`;
+  }
   if (!u.endsWith('/api')) {
     u = `${u}/api`;
   }
@@ -15,15 +19,14 @@ function normalizeApiBase(raw: string): string {
 }
 
 /**
- * В dev по умолчанию локальный бэкенд; иначе запросы шли бы на Amvera без frontend/.env — NetworkError.
- * В production — URL деплоя, если VITE_API_URL не задан при сборке.
+ * База API: из VITE_API_URL при сборке; иначе в dev — /api + proxy Vite на uvicorn; в prod — прямой URL Amvera (статика без Nginx-прокси).
  */
-const _rawBase =
-  import.meta.env.VITE_API_URL?.trim() ||
-  (import.meta.env.DEV
-    ? 'http://127.0.0.1:3000'
-    : 'https://lfk-b-svetlanagolovchanskaya.amvera.io');
-const API_BASE = normalizeApiBase(_rawBase);
+const _viteApiUrl = import.meta.env.VITE_API_URL?.trim() ?? '';
+const API_BASE = _viteApiUrl
+  ? normalizeApiBase(_viteApiUrl)
+  : import.meta.env.DEV
+    ? '/api'
+    : normalizeApiBase('https://lfk-b-svetlanagolovchanskaya.amvera.io');
 
 /**
  * Обёртка над fetch: «NetworkError» в браузере заменяем на понятный текст (часто — не запущен API или неверный VITE_API_URL).

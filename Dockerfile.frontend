@@ -8,7 +8,7 @@ WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci
 
-ARG VITE_API_URL=https://lfk-b-svetlanagolovchanskaya.amvera.io/api
+ARG VITE_API_URL=/api
 ENV VITE_API_URL=${VITE_API_URL}
 
 ARG VITE_CLERK_PUBLISHABLE_KEY=pk_test_aHVtb3JvdXMtbW9sbHktNTUuY2xlcmsuYWNjb3VudHMuZGV2JA
@@ -20,7 +20,8 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+ARG NGINX_CONFIG=nginx.conf
+COPY frontend/${NGINX_CONFIG} /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80

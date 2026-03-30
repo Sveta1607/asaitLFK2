@@ -8,8 +8,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Этот блок создаётся, чтобы передать адрес API в сборку фронтенда через env.
-ARG VITE_API_URL=https://lfk-b-svetlanagolovchanskaya.amvera.io/api
+# Этот блок создаётся, чтобы в сборке использовать относительный /api: Nginx проксирует на бэкенд (без CORS).
+ARG VITE_API_URL=/api
 ENV VITE_API_URL=${VITE_API_URL}
 
 # Этот блок создаётся, чтобы Clerk-ключ попал в продакшен-сборку (publishable key — публичный).

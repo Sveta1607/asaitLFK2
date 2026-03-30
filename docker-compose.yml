@@ -24,12 +24,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Этот блок создаётся, чтобы зашить URL API в production-сборку фронтенда.
-        VITE_API_URL: ${VITE_API_URL:-https://lfk-b-svetlanagolovchanskaya.amvera.io/api}
+        # Этот блок создаётся, чтобы /api шёл через Nginx на сервис backend (без CORS в браузере).
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        NGINX_CONFIG: ${NGINX_CONFIG:-nginx-docker-compose.conf}
     container_name: lfk-frontend
-    environment:
-      # Этот блок создаётся, чтобы зафиксировать текущее значение API URL в метаданных сервиса.
-      VITE_API_URL: ${VITE_API_URL:-https://lfk-b-svetlanagolovchanskaya.amvera.io/api}
     depends_on:
       # Этот блок создаётся, чтобы старт фронтенда происходил после старта backend-контейнера.
       - backend

@@ -8,8 +8,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Этот блок создаётся, чтобы передать адрес API в сборку фронтенда через env.
-ARG VITE_API_URL=https://lfk-b-svetlanagolovchanskaya.amvera.io/api
+# Этот блок создаётся, чтобы в сборке использовать относительный /api: Nginx проксирует на бэкенд (без CORS).
+# Для статики без Nginx задайте полный URL: --build-arg VITE_API_URL=https://ваш-бэкенд.../api
+ARG VITE_API_URL=/api
 ENV VITE_API_URL=${VITE_API_URL}
 
 # Этот блок создаётся, чтобы Clerk-ключ попал в продакшен-сборку (publishable key — публичный).
@@ -23,8 +24,9 @@ RUN npm run build
 # Этот этап создаётся, чтобы обслуживать только статику фронтенда через Nginx.
 FROM nginx:1.27-alpine
 
-# Этот блок создаётся, чтобы включить SPA-роутинг и проксировать статику корректно.
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Этот блок создаётся, чтобы выбрать прокси: nginx.conf → Amvera API; nginx-docker-compose.conf → сервис backend в compose.
+ARG NGINX_CONFIG=nginx.conf
+COPY ${NGINX_CONFIG} /etc/nginx/conf.d/default.conf
 
 # Этот блок создаётся, чтобы скопировать итоговую статику из этапа сборки.
 COPY --from=build /app/dist /usr/share/nginx/html
