@@ -207,13 +207,14 @@ def create_telegram_link_for_specialist(
     - выдать специалисту короткую ссылку t.me/bot?start=link_<токен> (лимит Telegram на параметр start);
     - одноразовый токен хранится в БД до привязки или истечения срока.
     """
-    bot_username = resolve_telegram_bot_username()
+    bot_username, telegram_config_error = resolve_telegram_bot_username()
     if not bot_username:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
-                "detail": "Задайте на сервере TELEGRAM_BOT_TOKEN или TELEGRAM_BOT_USERNAME (имя без @, символ @ в значении допускается).",
-                "code": "TELEGRAM_BOT_USERNAME_MISSING",
+                "detail": telegram_config_error
+                or "Задайте на сервере TELEGRAM_BOT_TOKEN или TELEGRAM_BOT_USERNAME.",
+                "code": "TELEGRAM_BOT_CONFIG",
             },
         )
     stmt = select(User).where(User.id == current_user.id)

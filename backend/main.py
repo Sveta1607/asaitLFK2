@@ -20,6 +20,8 @@ if _backend_env.is_file():
     _file_vals = dotenv_values(_backend_env)
     for _key in (
         "TELEGRAM_BOT_API_SECRET",
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_BOT_USERNAME",
         "ALLOWED_SPECIALIST_EMAIL",
         "DATABASE_URL",
         "CLERK_JWKS_URL",

@@ -17,22 +17,29 @@ log = get_logger()
 _bot_username_cache: Optional[str] = None
 
 
-def resolve_telegram_bot_username() -> Optional[str]:
+def resolve_telegram_bot_username() -> tuple[Optional[str], Optional[str]]:
     """
     Этот блок создаётся, чтобы:
     - собрать username для ссылки t.me/... (без @ в URL);
     - принимать TELEGRAM_BOT_USERNAME с ведущим @ или без;
-    - если username в env не задан — один раз запросить getMe по TELEGRAM_BOT_TOKEN (удобно для деплоя, где уже есть токен).
+    - если username в env не задан — один раз запросить getMe по TELEGRAM_BOT_TOKEN;
+    - вернуть (username, None) либо (None, текст для пользователя при 503).
+
+    Второй элемент — причина ошибки на русском (для ответа API и консоли фронта).
     """
     global _bot_username_cache
     from_env = (os.getenv("TELEGRAM_BOT_USERNAME") or "").strip().lstrip("@")
     if from_env:
-        return from_env
+        return from_env, None
     if _bot_username_cache:
-        return _bot_username_cache
+        return _bot_username_cache, None
     token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
     if not token:
-        return None
+        return None, (
+            "На сервере не заданы TELEGRAM_BOT_USERNAME и TELEGRAM_BOT_TOKEN. "
+            "В панели Amvera (переменные окружения бэкенда) укажите хотя бы одно: "
+            "TELEGRAM_BOT_USERNAME — имя бота без @ (как в t.me/…), или TELEGRAM_BOT_TOKEN — тот же, что у бота."
+        )
     try:
         r = requests.get(
             f"https://api.telegram.org/bot{token}/getMe",
@@ -43,21 +50,33 @@ def resolve_telegram_bot_username() -> Optional[str]:
                 "telegram_getme_failed",
                 extra={"event": "telegram_getme_failed", "status": r.status_code},
             )
-            return None
+            return None, (
+                "Сервер не смог получить имя бота через Telegram (ошибка API или токен неверный). "
+                "Укажите в переменных окружения бэкенда TELEGRAM_BOT_USERNAME (имя без @ из @BotFather) — тогда вызов api.telegram.org не нужен."
+            )
         data = r.json()
         result = data.get("result") if isinstance(data, dict) else None
         if not data.get("ok") or not isinstance(result, dict):
-            return None
+            return None, (
+                "Telegram вернул неожиданный ответ на getMe. Проверьте TELEGRAM_BOT_TOKEN "
+                "или задайте TELEGRAM_BOT_USERNAME вручную в настройках бэкенда."
+            )
         u = (result.get("username") or "").strip()
         if u:
             _bot_username_cache = u
-            return u
+            return u, None
     except requests.RequestException as e:
         log.warning(
             "telegram_getme_error",
             extra={"event": "telegram_getme_error", "error": str(e)[:200]},
         )
-    return None
+        return None, (
+            "С бэкенда нет доступа к api.telegram.org (сеть, таймаут или блокировка). "
+            "Задайте TELEGRAM_BOT_USERNAME в переменных окружения — имя бота без @, как в ссылке t.me/ваш_бот."
+        )
+    return None, (
+        "Не удалось определить имя бота. Задайте TELEGRAM_BOT_USERNAME в переменных окружения бэкенда."
+    )
 
 
 def _notify_env_enabled() -> bool:
