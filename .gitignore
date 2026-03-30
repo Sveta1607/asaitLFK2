@@ -24,3 +24,10 @@ telegram-bot/.env
 .DS_Store
 Thumbs.db
 
+# Служебные папки IDE и отладочные логи — не должны попадать в репозиторий и в клон на Amvera.
+.cursor/
+
+# Локальная SQLite из разработки (на сервере — отдельный файл в /data или Postgres).
+*.db
+backend/*.db
+

@@ -5,6 +5,7 @@
 .git/
 .gitignore
 .cursor/
+**/.cursor/
 .idea/
 .vscode/
 
@@ -26,9 +27,10 @@ telegram-bot/node_modules/
 src/node_modules/
 src/dist/
 
-# Локальные БД и секреты — не в образ.
+# Локальные БД и секреты — не в образ (на Amvera данные в persistent volume /data).
 *.db
 **/*.sqlite
+backend/*.db
 *.log
 .env
 **/.env
