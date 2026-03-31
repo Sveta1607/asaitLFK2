@@ -267,8 +267,10 @@ def require_telegram_bot_secret(
     _ensure_telegram_bot_secret_from_file()
     expected = (os.getenv("TELEGRAM_BOT_API_SECRET") or "").strip()
     if not expected:
+        # Этот блок создаётся, чтобы явно показать серверную проблему конфигурации:
+        # на части хостингов HTTP 503 подменяется HTML-страницей платформы и скрывает detail FastAPI.
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="TELEGRAM_BOT_API_SECRET не задан на сервере",
         )
     provided = (x_telegram_bot_secret or "").strip()
