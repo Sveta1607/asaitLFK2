@@ -816,6 +816,20 @@ const BookingPage: React.FC<{
     }
   }, [specialists, selectedSpecialistId]);
 
+  // Текущий выбранный специалист
+  const selectedSpecialist = specialists.find((s) => s.id === selectedSpecialistId);
+  const specialistDisplayName = selectedSpecialist
+    ? [selectedSpecialist.lastName, selectedSpecialist.firstName].filter(Boolean).join(' ') || 'Специалист'
+    : '';
+
+  // Слоты на выбранную дату для выбранного специалиста
+  const dateSlots = useMemo(
+    () => specialistSlots.filter((s) => s.date === selectedDate),
+    [specialistSlots, selectedDate]
+  );
+
+  const selectedSlot = dateSlots.find((s) => s.time === selectedTime);
+
   if (!currentUser || currentUser.role !== 'user') {
     return (
       <main className="mx-auto max-w-3xl px-4 py-8">
@@ -834,20 +848,6 @@ const BookingPage: React.FC<{
       </main>
     );
   }
-
-  // Текущий выбранный специалист
-  const selectedSpecialist = specialists.find((s) => s.id === selectedSpecialistId);
-  const specialistDisplayName = selectedSpecialist
-    ? [selectedSpecialist.lastName, selectedSpecialist.firstName].filter(Boolean).join(' ') || 'Специалист'
-    : '';
-
-  // Слоты на выбранную дату для выбранного специалиста
-  const dateSlots = useMemo(
-    () => specialistSlots.filter((s) => s.date === selectedDate),
-    [specialistSlots, selectedDate]
-  );
-
-  const selectedSlot = dateSlots.find((s) => s.time === selectedTime);
 
   const handleSelectSpecialist = (specId: string) => {
     setSelectedSpecialistId(specId);
@@ -1336,6 +1336,25 @@ const SpecialistSchedulePage: React.FC<{
     }
   }, [availableDatesForSpecialist]);
 
+  const specialistBookings = useMemo(
+    () =>
+      bookings.filter(
+        (b) => b.specialistId === currentUser?.id && b.status === 'active'
+      ),
+    [bookings, currentUser]
+  );
+
+  const dateSlots = useMemo(
+    () =>
+      slots.filter(
+        (s) =>
+          s.specialistId === currentUser?.id &&
+          s.date === selectedDate &&
+          s.status === 'free'
+      ),
+    [slots, currentUser, selectedDate]
+  );
+
   if (!currentUser || currentUser.role !== 'specialist') {
     return (
       <main className="mx-auto max-w-4xl px-4 py-8">
@@ -1351,25 +1370,6 @@ const SpecialistSchedulePage: React.FC<{
       </main>
     );
   }
-
-  const specialistBookings = useMemo(
-    () =>
-      bookings.filter(
-        (b) => b.specialistId === currentUser.id && b.status === 'active'
-      ),
-    [bookings, currentUser]
-  );
-
-  const dateSlots = useMemo(
-    () =>
-      slots.filter(
-        (s) =>
-          s.specialistId === currentUser.id &&
-          s.date === selectedDate &&
-          s.status === 'free'
-      ),
-    [slots, currentUser, selectedDate]
-  );
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
