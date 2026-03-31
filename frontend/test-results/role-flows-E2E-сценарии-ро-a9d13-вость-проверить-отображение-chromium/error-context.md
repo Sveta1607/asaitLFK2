@@ -1,0 +1,55 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "🧒 Детский ЛФК" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e7]: 🧒
+        - text: Детский ЛФК
+      - navigation [ref=e8]:
+        - link "Главная" [ref=e9] [cursor=pointer]:
+          - /url: /
+        - link "Войти" [ref=e10] [cursor=pointer]:
+          - /url: /login
+  - main [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e14]: 🔐
+        - heading "Вход в личный кабинет" [level=1] [ref=e15]
+        - paragraph [ref=e16]: Авторизуйтесь, чтобы записаться на занятия ЛФК
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e21]:
+            - heading "Проверьте Вашу почту" [level=1] [ref=e22]
+            - paragraph [ref=e23]: для продолжения работы в "LFK2"
+            - paragraph [ref=e25]: test1607@yandex.ru
+          - generic [ref=e26]:
+            - generic [ref=e27]:
+              - generic [ref=e29]:
+                - generic:
+                  - group
+                  - textbox "Enter verification code" [active] [ref=e30]
+              - button "Не получили код? Отправить снова. (11)" [disabled]
+            - paragraph [ref=e33]: Вы входите с нового устройства. Мы просим подтверждение для обеспечения безопасности вашего аккаунта.
+            - generic [ref=e34]:
+              - button "Продолжить" [ref=e35] [cursor=pointer]:
+                - generic [ref=e36]:
+                  - text: Продолжить
+                  - img [ref=e37]
+              - link "Использовать другой метод" [ref=e40] [cursor=pointer]:
+                - /url: http://localhost:3000/login/factor-two
+        - generic [ref=e43]:
+          - generic [ref=e45]:
+            - paragraph [ref=e46]: Secured by
+            - link "Clerk logo" [ref=e47] [cursor=pointer]:
+              - /url: https://go.clerk.com/components
+              - img [ref=e48]
+          - paragraph [ref=e53]: Development mode
+  - contentinfo [ref=e54]:
+    - generic [ref=e55]:
+      - paragraph [ref=e56]: 🧒 Детский ЛФК
+      - paragraph [ref=e57]: Запись на приём к специалисту по лечебной физкультуре
+      - paragraph [ref=e58]: Сделано с любовью
+```
