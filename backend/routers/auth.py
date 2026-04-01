@@ -6,8 +6,11 @@ from sqlalchemy.orm import Session
 from db import get_db
 from db_models import User
 from models import UserResponse
+from rate_limit import rate_limit_dependency
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+# Этот блок создаётся, чтобы ограничить попытки brute-force для login/register.
+auth_rate_limit = rate_limit_dependency(limit=5, window_seconds=60, scope="auth_login_register")
 
 
 def _validate_auth(data: dict) -> list[dict]:
@@ -30,7 +33,11 @@ def _validate_auth(data: dict) -> list[dict]:
 
 
 @router.post("/login", response_model=UserResponse)
-def login(body: dict = Body(...), db: Session = Depends(get_db)):
+def login(
+    body: dict = Body(...),
+    _: None = Depends(auth_rate_limit),
+    db: Session = Depends(get_db),
+):
     """Вход: валидация полей, поиск/создание пользователя по email+role."""
     errs = _validate_auth(body)
     if errs:
@@ -46,7 +53,11 @@ def login(body: dict = Body(...), db: Session = Depends(get_db)):
 
 
 @router.post("/register", response_model=UserResponse)
-def register(body: dict = Body(...), db: Session = Depends(get_db)):
+def register(
+    body: dict = Body(...),
+    _: None = Depends(auth_rate_limit),
+    db: Session = Depends(get_db),
+):
     """Регистрация: то же, что и login (упрощённая авторизация)."""
     errs = _validate_auth(body)
     if errs:

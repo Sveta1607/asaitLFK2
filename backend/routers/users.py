@@ -15,11 +15,15 @@ from db import get_db
 from db_models import TelegramLinkToken, User
 from models import UserUpdateRequest, UserResponse, SpecialistPublicResponse
 from logger import get_logger
+from rate_limit import rate_limit_dependency
 from telegram_link_token import can_issue_signed_telegram_link_token, create_signed_telegram_link_token
 from telegram_notify import resolve_telegram_bot_username
 
 router = APIRouter(prefix="/users", tags=["users"])
 log = get_logger()
+# Этот блок создаётся, чтобы ограничить частоту запросов к чувствительным маршрутам.
+sync_rate_limit = rate_limit_dependency(limit=10, window_seconds=60, scope="users_sync_from_clerk")
+telegram_link_rate_limit = rate_limit_dependency(limit=5, window_seconds=60, scope="users_telegram_link")
 
 
 def _allowed_specialist_email_norm() -> str:
@@ -201,6 +205,7 @@ def get_me(current_user: RequireUser, db: Session = Depends(get_db)):
 @router.post("/me/telegram-link", status_code=status.HTTP_200_OK)
 def create_telegram_link_for_specialist(
     current_user: RequireSpecialist,
+    _: None = Depends(telegram_link_rate_limit),
     db: Session = Depends(get_db),
 ):
     """
@@ -307,6 +312,7 @@ def list_specialists(current_user: RequireUser, db: Session = Depends(get_db)):
 @router.post("/sync-from-clerk", status_code=status.HTTP_200_OK)
 def sync_from_clerk(
     body: ClerkSyncRequest,
+    _: None = Depends(sync_rate_limit),
     payload: dict = Depends(get_clerk_payload),
     db: Session = Depends(get_db),
 ):

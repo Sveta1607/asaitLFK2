@@ -6,6 +6,7 @@ from pathlib import Path
 import sentry_sdk
 from dotenv import dotenv_values, load_dotenv
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # Блок: загрузка переменных окружения из backend/.env рядом с main.py.
@@ -71,33 +72,33 @@ app = FastAPI(
 # Блок: настройка CORS для фронтенда и dev-среды.
 # Нужен, чтобы браузер разрешал запросы с фронтенда Amvera и localhost.
 # Явные origins помогают избежать 405 на preflight OPTIONS за прокси Amvera.
-_default_origins = [
-    "https://front-svetlanagolovchanskaya.amvera.io",
-    "http://front-svetlanagolovchanskaya.amvera.io",
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:3000",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-]
+_is_production = (os.getenv("APP_ENV") or os.getenv("ENVIRONMENT") or "production").strip().lower() == "production"
+# Этот блок создаётся, чтобы:
+# - в production разрешать только явно указанные домены;
+# - в development оставить localhost для удобной отладки.
+if _is_production:
+    _default_origins = [
+        "https://front-svetlanagolovchanskaya.amvera.io",
+    ]
+else:
+    _default_origins = [
+        "https://front-svetlanagolovchanskaya.amvera.io",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ]
 _cors_env = os.getenv("CORS_ORIGINS", "").strip()
 origins = _default_origins + [x.strip() for x in _cors_env.split(",") if x.strip()]
-# Этот regex создаётся, чтобы браузер не блокировал API для *.amvera.io (опциональный порт). CORS_EXTRA_ORIGIN_REGEX — свой домен, полное выражение без ^$.
-_amvera_part = r"https?://[a-zA-Z0-9.-]+\.amvera\.io(?::\d+)?"
-_cors_extra = (os.getenv("CORS_EXTRA_ORIGIN_REGEX") or "").strip()
-if _cors_extra:
-    _amvera_origin_regex = rf"^(?:{_amvera_part}|{_cors_extra})$"
-else:
-    _amvera_origin_regex = rf"^{_amvera_part}$"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=_amvera_origin_regex,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"],
+    # Этот блок создаётся, чтобы ограничить список заголовков минимально необходимыми.
+    allow_headers=["Authorization", "Content-Type", "X-Telegram-Bot-Secret"],
 )
 
 # Middleware для логирования каждого HTTP-запроса: метод, путь, статус, время ответа.
@@ -124,6 +125,19 @@ async def log_requests(request: Request, call_next):
         logger.info("HTTP request", extra=log_data)
 
     return response
+
+
+# Глобальный обработчик создаётся, чтобы в продакшене не отдавать внутренние stack traces наружу.
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception(
+        "unhandled_exception",
+        extra={"path": request.url.path, "method": request.method},
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Внутренняя ошибка сервера."},
+    )
 
 
 # Блок: подключение роутеров под префиксом /api.

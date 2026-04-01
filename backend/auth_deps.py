@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import logging
 from typing import Annotated, Callable, List, Optional
 
 from pathlib import Path
@@ -25,6 +26,8 @@ from db_models import User
 
 # Кэш JWKS по URL, чтобы не запрашивать на каждый запрос
 _jwks_cache: dict = {}
+# Этот блок создаётся, чтобы логировать внутренние ошибки без утечки деталей клиенту.
+_log = logging.getLogger(__name__)
 
 
 def _ensure_clerk_env() -> None:
@@ -65,10 +68,11 @@ def _get_jwks() -> dict:
             r = requests.get(url, timeout=10)
             r.raise_for_status()
             _jwks_cache[url] = r.json()
-        except Exception as e:
+        except Exception:
+            _log.exception("failed_to_load_clerk_jwks")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Не удалось загрузить JWKS Clerk: {e}",
+                detail="Сервис аутентификации временно недоступен.",
             )
     return _jwks_cache[url]
 
@@ -100,25 +104,55 @@ def _get_kid_from_token(token: str) -> Optional[str]:
         return None
 
 
+def _get_public_key_pem_for_token(token: str) -> bytes:
+    """
+    Этот блок создаётся, чтобы:
+    - выбрать из JWKS нужный публичный ключ по kid из JWT;
+    - отдать ключ в PEM-формате для проверки подписи JWT.
+    """
+    jwks = _get_jwks()
+    kid = _get_kid_from_token(token)
+    if not kid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Недействительный токен.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    keys = jwks.get("keys") if isinstance(jwks, dict) else None
+    if not isinstance(keys, list):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Сервис аутентификации временно недоступен.",
+        )
+    for key_data in keys:
+        if isinstance(key_data, dict) and key_data.get("kid") == kid:
+            public_jwk = jwk.JWK.from_json(json.dumps(key_data))
+            return public_jwk.export_to_pem(private_key=False, password=None)
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Недействительный токен.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 def verify_clerk_token(token: str) -> dict:
     """
     Верифицирует JWT Clerk и возвращает payload.
 
-    ВАЖНО: сейчас для упрощения разработки проверка подписи ОТКЛЮЧЕНА.
-    Это нужно, чтобы не блокировать работу из‑за расхождения настроек
-    Clerk и JWKS. В бою подпись обязательно нужно включить обратно.
+    Этот блок создаётся, чтобы:
+    - включить проверку подписи JWT через JWKS Clerk;
+    - валидировать срок действия токена и issuer (если CLERK_ISSUER задан).
     """
-    options = {
-        "verify_signature": False,
-        "verify_exp": False,
-        "verify_iss": False,
-        "verify_iat": False,
-    }
+    _ensure_clerk_env()
+    issuer = (os.getenv("CLERK_ISSUER") or "").strip() or None
     try:
+        key = _get_public_key_pem_for_token(token)
         payload = jwt.decode(
             token,
+            key=key,
             algorithms=["RS256"],
-            options=options,
+            options={"verify_aud": False},
+            issuer=issuer,
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -126,13 +160,19 @@ def verify_clerk_token(token: str) -> dict:
             detail="Срок действия токена истёк",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except jwt.InvalidTokenError as e:
+    except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            # Этот текст создаётся, чтобы видеть причину ошибки валидации JWT,
-            # а не только общее сообщение "Недействительный токен".
-            detail=f"Недействительный токен: {e}",
+            detail="Недействительный токен.",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        _log.exception("unexpected_jwt_verification_error")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Сервис аутентификации временно недоступен.",
         )
     return payload
 
