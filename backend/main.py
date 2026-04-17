@@ -72,7 +72,7 @@ app = FastAPI(
 # Блок: настройка CORS для фронтенда и dev-среды.
 # Нужен, чтобы браузер разрешал запросы с фронтенда Amvera и localhost.
 # Явные origins помогают избежать 405 на preflight OPTIONS за прокси Amvera.
-_is_production = (os.getenv("APP_ENV") or os.getenv("ENVIRONMENT") or "production").strip().lower() == "production"
+_is_production = (os.getenv("APP_ENV") or os.getenv("ENVIRONMENT") or "development").strip().lower() == "production"
 # Этот блок создаётся, чтобы:
 # - в production разрешать только явно указанные домены;
 # - в development оставить localhost для удобной отладки.

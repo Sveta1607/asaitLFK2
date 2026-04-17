@@ -55,7 +55,15 @@ if (!apiSecret) {
 
 const apiBaseUrl = (process.env.API_BASE_URL || "http://127.0.0.1:3000").trim();
 
-const { bot } = createBot(token, { apiBaseUrl, apiSecret });
+/** Ключ OpenAI для ассистента в чате (опционально: без него работает только запись /start). */
+const openAiApiKey = (process.env.OPENAI_API_KEY || "").trim();
+if (!openAiApiKey) {
+  console.warn(
+    "[telegram-bot] OPENAI_API_KEY не задан — ответы ассистента на свободные сообщения отключены.",
+  );
+}
+
+const { bot } = createBot(token, { apiBaseUrl, apiSecret, openAiApiKey });
 
 bot.launch().then(() => {
   console.log("Telegram-бот запущен (long polling)");

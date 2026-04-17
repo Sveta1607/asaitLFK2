@@ -62,6 +62,31 @@ async function apiFetch(apiBaseUrl, apiSecret, path, options = {}) {
   return data;
 }
 
+/**
+ * Этот блок создаётся, чтобы подтянуть новости центра без секрета бота (публичный GET /api/news).
+ */
+export async function fetchPublicNews(apiBaseUrl) {
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const url = `${base}/api/news`;
+  let r;
+  try {
+    r = await fetch(url, { headers: { Accept: "application/json" } });
+  } catch (err) {
+    throw new Error(explainNetworkError(err, url));
+  }
+  const text = await r.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : [];
+  } catch {
+    data = [];
+  }
+  if (!r.ok) {
+    throw new Error(`${r.status}: ${text || "news request failed"}`);
+  }
+  return Array.isArray(data) ? data : [];
+}
+
 /** Список одобренных специалистов (как на сайте) */
 export function fetchSpecialists(apiBaseUrl, apiSecret) {
   return apiFetch(apiBaseUrl, apiSecret, "/api/telegram/specialists");

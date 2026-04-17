@@ -6,6 +6,8 @@
 
 import { Telegraf, Markup } from "telegraf";
 import { createBooking, fetchSlots, fetchSpecialists, linkTelegramChat } from "./api.js";
+import { buildLlmContext } from "./llmContext.js";
+import { getAiReply } from "./openaiChat.js";
 import { emptyDraft, getSession, resetSession, State } from "./sessionStore.js";
 
 function formatDateRu(yyyyMmDd) {
@@ -144,11 +146,33 @@ async function runTelegramSpecialistLink(ctx, apiBaseUrl, apiSecret, linkToken) 
 }
 
 /**
+ * Этот блок держит индикатор «печатает…» в Telegram, пока идёт запрос к LLM (обновление каждые ~4 с).
+ */
+async function withTyping(ctx, work) {
+  const chatId = ctx.chat.id;
+  const tick = () => ctx.telegram.sendChatAction(chatId, "typing").catch(() => {});
+  await tick();
+  const id = setInterval(tick, 4000);
+  try {
+    return await work();
+  } finally {
+    clearInterval(id);
+  }
+}
+
+/** Состояния, где текст сообщения — это только данные для записи (не вопрос ассистенту). */
+const BOOKING_TEXT_STATES = new Set([
+  State.ENTER_FIRST_NAME,
+  State.ENTER_LAST_NAME,
+  State.ENTER_PHONE,
+]);
+
+/**
  * @param {string} token — TELEGRAM_BOT_TOKEN
- * @param {{ apiBaseUrl: string, apiSecret: string }} api — URL бэкенда и TELEGRAM_BOT_API_SECRET
+ * @param {{ apiBaseUrl: string, apiSecret: string, openAiApiKey?: string }} api — бэкенд, секрет бота и ключ OpenAI
  */
 export function createBot(token, api) {
-  const { apiBaseUrl, apiSecret } = api;
+  const { apiBaseUrl, apiSecret, openAiApiKey = "" } = api;
   const bot = new Telegraf(token);
 
   // Блок: /link <токен> — ручная привязка, если deep link из браузера ведёт себя нестабильно.
@@ -425,9 +449,44 @@ export function createBot(token, api) {
       return;
     }
 
-    await ctx.reply(
-      "Нажмите /start, чтобы записаться на приём, или /cancel для сброса.",
-    );
+    // Этот блок отвечает произвольным текстом через OpenAI, когда пользователь не на шаге ввода ФИО/телефона.
+    if (!BOOKING_TEXT_STATES.has(s.state)) {
+      if (text.startsWith("/")) {
+        await ctx.reply(
+          "Неизвестная команда. Доступны: /start — запись, /cancel — сброс, /link — привязка для специалиста.",
+        );
+        return;
+      }
+      const key = (openAiApiKey || "").trim();
+      if (!key) {
+        await ctx.reply(
+          "Ассистент выключен: задайте OPENAI_API_KEY в telegram-bot/.env. Запись: /start.",
+        );
+        return;
+      }
+      await withTyping(ctx, async () => {
+        let dataContext;
+        try {
+          dataContext = await buildLlmContext(apiBaseUrl, apiSecret);
+        } catch (e) {
+          dataContext = [
+            "Не удалось загрузить данные с API центра:",
+            e.message || String(e),
+            "",
+            "Не выдумывай расписание, специалистов и новости центра; отвечай только общими сведениями о ЛФК/реабилитации детей или предложи /start для записи.",
+          ].join("\n");
+        }
+        try {
+          const answer = await getAiReply(text, dataContext, key);
+          await ctx.reply(answer);
+        } catch (e) {
+          await ctx.reply(
+            `Сейчас не получилось связаться с ассистентом: ${e.message || String(e)}`,
+          );
+        }
+      });
+      return;
+    }
   });
 
   return { bot };

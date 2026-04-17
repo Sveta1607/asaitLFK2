@@ -29,7 +29,7 @@ REM This block is created to stop if env file is missing.
 if not exist ".env" (
   echo Missing .env file in:
   echo %CD%
-  echo Copy .env.example to .env and set TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_API_SECRET, API_BASE_URL.
+  echo Copy .env.example to .env and set TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_API_SECRET, API_BASE_URL, OPENAI_API_KEY.
   pause
   exit /b 1
 )
