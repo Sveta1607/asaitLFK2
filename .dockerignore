@@ -23,9 +23,7 @@ frontend/dist/
 frontend/playwright-report/
 frontend/test-results/
 
-# Сборка Dockerfile.frontend использует только каталог frontend/: бэкенд и бот не копируются, но без исключения
-# они всё равно уезжают в контекст на Amvera → долгая отправка и шаг «transferring context».
-backend/
+# telegram-bot собирается отдельным проектом с контекстом telegram-bot/ — в корень контекста фронта/бэкенда не тащим.
 telegram-bot/
 
 # Дубликат исходников в корне (если есть).
@@ -50,5 +48,5 @@ docker-compose.yml
 **/.pytest_cache/
 **/.mypy_cache/
 
-# ВАЖНО: папки frontend/, backend/, telegram-bot/ как каталоги НЕ исключаем —
-# Dockerfile копирует нужные файлы; исключаем только перечисленное выше внутри них.
+# backend/ не исключаем целиком: backend/Dockerfile делает COPY backend/requirements.txt при контексте = корень репо (Amvera lfk-b).
+# Тяжёлый мусор внутри backend уже отфильтрован паттернами выше (__pycache__, venv, *.db).
