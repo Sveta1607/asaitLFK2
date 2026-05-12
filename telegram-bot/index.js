@@ -1,5 +1,5 @@
 /**
- * Точка входа: загрузка .env, проверка токена и секрета API, запуск Telegraf.
+ * Точка входа: загрузка .env, проверка токена и секрета API, проверка Telegram (getMe), запуск Telegraf.
  */
 
 import fs from "fs";
@@ -65,19 +65,96 @@ if (!openAiApiKey) {
 
 const { bot } = createBot(token, { apiBaseUrl, apiSecret, openAiApiKey });
 
-bot.launch().then(() => {
-  console.log("Telegram-бот запущен (long polling)");
-  console.log(`API: ${apiBaseUrl}`);
-  // Предупреждение: hex-токен привязки живёт в БД того API, куда ходит сайт; localhost ≠ Amvera.
-  const low = apiBaseUrl.toLowerCase();
-  if (low.includes("127.0.0.1") || low.includes("localhost")) {
-    console.warn(
-      "[telegram-bot] API_BASE_URL указывает на эту машину. Если ссылку «Получить ссылку» выдаёт сайт на хостинге, " +
-        "токен записан в БД на сервере, а бот ищет его здесь → в чате будет «ссылка недействительна». " +
-        "Поставьте URL продакшен-API (как у nginx proxy к бэкенду).",
-    );
+/**
+ * Этот блок различает «битый токен» и обрыв сети до api.telegram.org — текст ошибки у fetch часто общий и вводит в заблуждение.
+ */
+function formatGetMeFailureHelp(err) {
+  const raw = `${err?.message || err}${err?.response?.description || ""}`.toLowerCase();
+  const isNetworkLikely =
+    /tls|socket|disconnect|econnreset|etimedout|enotfound|network|timed out|fetch failed/i.test(raw) ||
+    /before secure/i.test(raw);
+  const isUnauthorized =
+    /401|unauthorized|not valid/i.test(raw);
+
+  let hint =
+    "[telegram-bot] getMe не прошёл.\n" +
+    "Техническое сообщение: " +
+    String(err?.message || err).trim();
+  if (isUnauthorized) {
+    hint +=
+      "\n\nПохоже на неверный или отозванный TELEGRAM_BOT_TOKEN (проверь в @BotFather).";
+  } else if (isNetworkLikely) {
+    hint +=
+      "\n\nПохоже на проблему СЕТИ до api.telegram.org (обрыв на этапе TLS), а не обязательно на токене: " +
+      "часто так бывает при блокировках, антивирусе, корпоративном фаерволе или нестабильном канале.\n" +
+      "Что попробовать: другой Wi‑Fi/мобильный интернет, VPN, отключить лишние фильтры HTTPS, " +
+      "или запустить бота на VPS за пределами блокировки. Клиент Telegram в браузере/телефоне к api.telegram.org не ходит — его работоспособность тут ни о чём не говорит.";
+  } else {
+    hint +=
+      "\n\nЕсли есть VPN — включи и перезапусти бота. Если без VPN иногда доступен Telegram в приложении, бот всё равно ходит на api.telegram.org с твоего ПК — возможны блокировки только для API.";
   }
-});
+  return hint;
+}
+
+/**
+ * Этот блок собирается в async: до polling проверить токен и сеть к Telegram иначе /start «мёртв» без понятной причины.
+ */
+async function startBot() {
+  console.log("[telegram-bot] Проверка связи с Telegram (getMe)…");
+  try {
+    const me = await bot.telegram.getMe();
+    console.log(`[telegram-bot] Токен ок: @${me.username ?? "(нет username)"} (${me.first_name ?? "bot"})`);
+  } catch (e) {
+    console.error(formatGetMeFailureHelp(e));
+    process.exit(1);
+  }
+
+  // Этот блок снимает webhook вручную: при конфликте с другим хостингом long polling может не получать апдейты.
+  try {
+    const whBefore = await bot.telegram.getWebhookInfo();
+    await bot.telegram.deleteWebhook({ drop_pending_updates: false });
+    if ((whBefore?.url || "").trim()) {
+      console.log(`[telegram-bot] Снят webhook (был: ${whBefore.url}). Используется long polling.`);
+    }
+  } catch (e) {
+    console.warn("[telegram-bot] deleteWebhook:", e.message || e);
+  }
+
+  await bot.launch();
+}
+
+startBot()
+  .then(async () => {
+    console.log("Telegram-бот запущен (long polling)");
+    console.log(`API: ${apiBaseUrl}`);
+
+    try {
+      const wh = await bot.telegram.getWebhookInfo();
+      if ((wh?.url || "").trim()) {
+        console.warn(
+          `[telegram-bot] После удаления webhook URL всё ещё указан (${wh.url}) — возможен другой активный процесс с этим же токеном.`,
+        );
+      }
+      if ((wh.pending_update_count ?? 0) > 0) {
+        console.warn(`[telegram-bot] Необработанных апдейтов в очереди Telegram: ${wh.pending_update_count}`);
+      }
+    } catch (e) {
+      console.warn("[telegram-bot] getWebhookInfo:", e.message || e);
+    }
+
+    const low = apiBaseUrl.toLowerCase();
+    if (low.includes("127.0.0.1") || low.includes("localhost")) {
+      console.warn(
+        "[telegram-bot] API_BASE_URL указывает на эту машину. Если ссылку «Получить ссылку» выдаёт сайт на хостинге, " +
+          "токен записан в БД на сервере, а бот ищет его здесь → в чате будет «ссылка недействительна». " +
+          "Поставьте URL продакшен-API (как у nginx proxy к бэкенду).",
+      );
+    }
+  })
+  .catch((err) => {
+    console.error("[telegram-bot] Не удалось запустить:", err.message || err);
+    process.exit(1);
+  });
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));

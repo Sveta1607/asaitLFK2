@@ -6,7 +6,9 @@
 
 import { Telegraf, Markup } from "telegraf";
 import { createBooking, fetchSlots, fetchSpecialists, linkTelegramChat } from "./api.js";
+import { fetchInternetNewsContextForLlm } from "./internetNews.js";
 import { buildLlmContext } from "./llmContext.js";
+import { interpretNewsSourceReply, isNewsRelatedQuestion } from "./newsIntent.js";
 import { getAiReply } from "./openaiChat.js";
 import { emptyDraft, getSession, resetSession, State } from "./sessionStore.js";
 
@@ -168,12 +170,100 @@ const BOOKING_TEXT_STATES = new Set([
 ]);
 
 /**
+ * Этот блок — вежливый текст и кнопки, чтобы пользователь явно выбрал источник новостей (сайт центра или открытый интернет).
+ */
+const NEWS_SOURCE_PROMPT =
+  "Подскажите, пожалуйста: вас интересуют новости, опубликованные на сайте нашего центра, " +
+  "или краткий обзор материалов из открытых источников в интернете по теме детского здоровья, ЛФК и реабилитации? " +
+  "Выберите вариант кнопкой ниже — так мы не перепутаем источник.";
+
+/**
+ * Этот блок рисует inline-клавиатуру выбора источника новостей (короткий callback ns:… для лимита Telegram).
+ */
+function newsSourceKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback("С сайта центра", "ns:site"),
+      Markup.button.callback("Из интернета", "ns:net"),
+    ],
+  ]);
+}
+
+/**
+ * Этот блок формирует читаемый список новостей с сайта — пользователь видит факты даже если модель скупится на детали.
+ */
+function formatSiteNewsForTelegram(items) {
+  if (!items?.length) {
+    return "";
+  }
+  const lines = items.slice(0, 15).map((n) => {
+    const title = (n.title || "").trim();
+    const date = (n.date || "").trim();
+    const ex = (n.excerpt || "").replace(/\s+/g, " ").trim().slice(0, 200);
+    const tail = ex ? `\n  ${ex}` : "";
+    return `• ${date} — ${title}${tail}`;
+  });
+  return `📰 Новости с сайта центра:\n${lines.join("\n")}`;
+}
+
+/**
+ * Этот блок отвечает по новостям сайта: сначала явный список из API, затем краткий ответ LLM по тому же контексту.
+ */
+async function replyAiWithSiteNews(ctx, apiBaseUrl, apiSecret, questionText, key) {
+  const { dataContext, siteNewsItems, newsLoadError } = await buildLlmContext(
+    apiBaseUrl,
+    apiSecret,
+  );
+  const headerParts = [];
+  if (newsLoadError) {
+    headerParts.push(
+      `Не удалось загрузить новости с сайта: ${newsLoadError}. Проверьте API_BASE_URL бота и доступность ${apiBaseUrl.replace(/\/$/, "")}/api/news`,
+    );
+  } else if (siteNewsItems.length) {
+    headerParts.push(formatSiteNewsForTelegram(siteNewsItems));
+  } else {
+    headerParts.push("На сайте центра сейчас нет опубликованных новостей в выгрузке API.");
+  }
+  const answer = await getAiReply(questionText, dataContext, key);
+  const full = [...headerParts, answer].filter(Boolean).join("\n\n").slice(0, 4090);
+  await ctx.reply(full, { disable_web_page_preview: true });
+}
+
+/**
+ * Этот блок подгружает RSS из интернета и просит модель выбрать релевантную публикацию без выдумывания фактов.
+ */
+async function replyAiWithInternetNews(ctx, questionText, key) {
+  const rss = await fetchInternetNewsContextForLlm(questionText);
+  const dataContext = [
+    "Режим: ответ только по приведённым ниже строкам RSS (открытые источники). Это не официальный контент центра; не подставляй новости с сайта клиники.",
+    "",
+    rss,
+    "",
+    "Задача: выбери одну или две записи, наиболее близкие к вопросу пользователя и теме здоровья детей, ЛФК и реабилитации. Кратко перескажи только по фактам из списка; обязательно укажи ссылку(и). Если подходящего материала нет — скажи честно. Без диагнозов и назначений.",
+  ].join("\n");
+  const answer = await getAiReply(questionText, dataContext, key);
+  await ctx.reply(answer);
+}
+
+/**
  * @param {string} token — TELEGRAM_BOT_TOKEN
  * @param {{ apiBaseUrl: string, apiSecret: string, openAiApiKey?: string }} api — бэкенд, секрет бота и ключ OpenAI
  */
 export function createBot(token, api) {
   const { apiBaseUrl, apiSecret, openAiApiKey = "" } = api;
   const bot = new Telegraf(token);
+
+  // Этот блок включается через TELEGRAM_BOT_DEBUG=1 — видно, доходят ли апдейты от Telegram до бота (если строк нет при /start — проблема сети или webhook).
+  if ((process.env.TELEGRAM_BOT_DEBUG || "").trim() === "1") {
+    bot.use(async (ctx, next) => {
+      const t = ctx.message?.text;
+      const cq = ctx.callbackQuery?.data;
+      console.log(
+        `[telegram-bot] update_id=${ctx.update?.update_id} chat=${ctx.chat?.id} text=${t ? JSON.stringify(t) : "-"} cb=${cq ? JSON.stringify(cq) : "-"}`,
+      );
+      return next();
+    });
+  }
 
   // Блок: /link <токен> — ручная привязка, если deep link из браузера ведёт себя нестабильно.
   bot.command("link", async (ctx) => {
@@ -234,7 +324,39 @@ export function createBot(token, api) {
     s.state = State.IDLE;
     s.draft = emptyDraft();
     s.specialistsList = [];
+    s.pendingNewsUserText = null;
     await ctx.reply("Запись отменена. Нажмите /start, чтобы начать снова.");
+  });
+
+  // Блок: выбор источника новостей после вопроса пользователя (сайт центра или RSS интернета).
+  bot.action(/^ns:(site|net)$/, async (ctx) => {
+    await ctx.answerCbQuery();
+    const uid = ctx.from.id;
+    const s = getSession(uid);
+    const kind = ctx.match[1];
+    const key = (openAiApiKey || "").trim();
+    if (!key) {
+      s.pendingNewsUserText = null;
+      await ctx.reply(
+        "Ассистент выключен: задайте OPENAI_API_KEY в telegram-bot/.env. Запись: /start.",
+      );
+      return;
+    }
+    const q = s.pendingNewsUserText || "Расскажите, какие есть новости.";
+    s.pendingNewsUserText = null;
+    await withTyping(ctx, async () => {
+      try {
+        if (kind === "site") {
+          await replyAiWithSiteNews(ctx, apiBaseUrl, apiSecret, q, key);
+        } else {
+          await replyAiWithInternetNews(ctx, q, key);
+        }
+      } catch (e) {
+        await ctx.reply(
+          `Сейчас не получилось обработать запрос: ${e.message || String(e)}`,
+        );
+      }
+    });
   });
 
   // Блок: выбор специалиста — подгрузка реальных слотов из БД
@@ -464,19 +586,54 @@ export function createBot(token, api) {
         );
         return;
       }
-      await withTyping(ctx, async () => {
-        let dataContext;
-        try {
-          dataContext = await buildLlmContext(apiBaseUrl, apiSecret);
-        } catch (e) {
-          dataContext = [
-            "Не удалось загрузить данные с API центра:",
-            e.message || String(e),
-            "",
-            "Не выдумывай расписание, специалистов и новости центра; отвечай только общими сведениями о ЛФК/реабилитации детей или предложи /start для записи.",
-          ].join("\n");
+
+      // Этот блок обрабатывает уточнение источника новостей и повторный вопрос, пока ждём выбор кнопкой или текстом.
+      if (s.pendingNewsUserText) {
+        const src = interpretNewsSourceReply(text);
+        if (src === "site") {
+          const q = s.pendingNewsUserText;
+          s.pendingNewsUserText = null;
+          await withTyping(ctx, async () => {
+            try {
+              await replyAiWithSiteNews(ctx, apiBaseUrl, apiSecret, q, key);
+            } catch (e) {
+              await ctx.reply(
+                `Сейчас не получилось обработать запрос: ${e.message || String(e)}`,
+              );
+            }
+          });
+          return;
         }
+        if (src === "internet") {
+          const q = s.pendingNewsUserText;
+          s.pendingNewsUserText = null;
+          await withTyping(ctx, async () => {
+            try {
+              await replyAiWithInternetNews(ctx, q, key);
+            } catch (e) {
+              await ctx.reply(
+                `Сейчас не получилось обработать запрос: ${e.message || String(e)}`,
+              );
+            }
+          });
+          return;
+        }
+        if (isNewsRelatedQuestion(text)) {
+          s.pendingNewsUserText = text;
+          await ctx.reply(NEWS_SOURCE_PROMPT, newsSourceKeyboard());
+          return;
+        }
+        s.pendingNewsUserText = null;
+      } else if (isNewsRelatedQuestion(text)) {
+        s.pendingNewsUserText = text;
+        await ctx.reply(NEWS_SOURCE_PROMPT, newsSourceKeyboard());
+        return;
+      }
+
+      // Этот блок оборачивает и загрузку контекста, и OpenAI — иначе при ошибке buildLlmContext ответа в чат не было.
+      await withTyping(ctx, async () => {
         try {
+          const { dataContext } = await buildLlmContext(apiBaseUrl, apiSecret);
           const answer = await getAiReply(text, dataContext, key);
           await ctx.reply(answer);
         } catch (e) {
@@ -487,6 +644,19 @@ export function createBot(token, api) {
       });
       return;
     }
+  });
+
+  // Этот блок создаётся, чтобы на голос, стикеры и фото не было «тишины» — обработчик текста их не видит.
+  bot.on(["photo", "voice", "video_note", "sticker", "document", "audio", "video"], async (ctx) => {
+    await ctx.reply(
+      "Пока отвечаю только на текст. Напиши вопрос сообщением или отправь /start для записи.",
+    );
+  });
+
+  // Этот блок ловит необработанные ошибки Telegraf, чтобы пользователь видел ответ, а не пустоту.
+  bot.catch((err, ctx) => {
+    console.error("[telegram-bot] update error:", err);
+    return ctx.reply("Произошла ошибка при обработке сообщения. Попробуй ещё раз или /start.").catch(() => {});
   });
 
   return { bot };

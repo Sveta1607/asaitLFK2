@@ -41,6 +41,8 @@ export function getSession(telegramUserId) {
       state: State.IDLE,
       draft: emptyDraft(),
       specialistsList: [],
+      /** Текст вопроса про новости, пока пользователь не выбрал источник (сайт или интернет). */
+      pendingNewsUserText: null,
     });
   }
   return store.get(telegramUserId);
@@ -55,6 +57,7 @@ export function resetSession(telegramUserId, specialistsList = []) {
     state: State.CHOOSE_SPECIALIST,
     draft: emptyDraft(),
     specialistsList,
+    pendingNewsUserText: null,
   });
   return store.get(telegramUserId);
 }

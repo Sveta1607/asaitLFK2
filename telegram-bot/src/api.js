@@ -4,8 +4,30 @@
  * - создавать запись в общей таблице bookings.
  */
 
+/** Таймаут HTTP к бэкенду (мс): без этого «вечный» fetch блокирует /start без ответа в чате. */
+const FETCH_TIMEOUT_MS = Math.max(
+  5000,
+  Number.parseInt(process.env.API_FETCH_TIMEOUT_MS || "25000", 10) || 25000,
+);
+
+/**
+ * Этот блок создаётся, чтобы обёртка fetch прерывалась по таймауту и пользователь получал текст ошибки, а не тишину.
+ */
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(tid);
+  }
+}
+
 /** Разворачивает причину «fetch failed» (ECONNREFUSED и т.д.) в понятный текст для пользователя */
 function explainNetworkError(err, requestUrl) {
+  if (err?.name === "AbortError") {
+    return `Таймаут запроса (${FETCH_TIMEOUT_MS} мс): ${requestUrl}`;
+  }
   const cause = err?.cause;
   const code = cause?.code || err?.code;
   const baseHint =
@@ -33,7 +55,7 @@ async function apiFetch(apiBaseUrl, apiSecret, path, options = {}) {
   };
   let r;
   try {
-    r = await fetch(url, { ...options, headers });
+    r = await fetchWithTimeout(url, { ...options, headers });
   } catch (err) {
     throw new Error(explainNetworkError(err, url));
   }
@@ -63,6 +85,32 @@ async function apiFetch(apiBaseUrl, apiSecret, path, options = {}) {
 }
 
 /**
+ * Этот блок создаётся, чтобы загрузить тексты главной страницы с сайта (GET /api/site-content/home) —
+ * без секрета бота, для ответов ассистента про организацию и направления центра.
+ */
+export async function fetchPublicHomeContent(apiBaseUrl) {
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const url = `${base}/api/site-content/home`;
+  let r;
+  try {
+    r = await fetchWithTimeout(url, { headers: { Accept: "application/json" } });
+  } catch (err) {
+    throw new Error(explainNetworkError(err, url));
+  }
+  const text = await r.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = {};
+  }
+  if (!r.ok) {
+    throw new Error(`${r.status}: ${text || "home content request failed"}`);
+  }
+  return typeof data === "object" && data !== null ? data : {};
+}
+
+/**
  * Этот блок создаётся, чтобы подтянуть новости центра без секрета бота (публичный GET /api/news).
  */
 export async function fetchPublicNews(apiBaseUrl) {
@@ -70,7 +118,7 @@ export async function fetchPublicNews(apiBaseUrl) {
   const url = `${base}/api/news`;
   let r;
   try {
-    r = await fetch(url, { headers: { Accept: "application/json" } });
+    r = await fetchWithTimeout(url, { headers: { Accept: "application/json" } });
   } catch (err) {
     throw new Error(explainNetworkError(err, url));
   }
