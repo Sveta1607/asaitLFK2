@@ -1,0 +1,15 @@
+# Этот файл создаётся, чтобы Amvera собирала образ бота из папки telegram-bot (Dockerfile в корне контекста).
+# В интерфейсе Amvera корень Git для этого приложения должен содержать эту папку как корень проекта —
+# или в основном репозитории укажите подкаталог/контекст сборки telegram-bot согласно документации Amvera.
+meta:
+  environment: docker
+  toolchain:
+    name: docker
+    version: latest
+build:
+  dockerfile: Dockerfile
+  skip: false
+run:
+  # Должен совпадать с переменной BOT_HEALTH_PORT в окружении (см. index.js — лёгкий HTTP /health для пробы).
+  containerPort: 8080
+  servicePort: 8080

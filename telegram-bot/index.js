@@ -3,12 +3,37 @@
  */
 
 import fs from "fs";
+import http from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { createBot } from "./src/bot.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Этот блок поднимает GET /health на 0.0.0.0 — на Amvera/Kubernetes часто обязательна «проба» по порту;
+ * без слушающего сокета контейнер с long polling может бесконечно перезапускаться и «не отвечать» в Telegram.
+ */
+function startProbeHttpServer(port) {
+  const server = http.createServer((req, res) => {
+    const pathname = req.url?.split("?")[0] || "/";
+    if (pathname === "/health" || pathname === "/") {
+      res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("ok");
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`[telegram-bot] HTTP для пробы: http://0.0.0.0:${port}/health`);
+  });
+  server.on("error", (e) => {
+    console.error("[telegram-bot] Не удалось открыть порт для пробы:", e.message);
+    process.exit(1);
+  });
+}
 
 /**
  * Читает .env в UTF-8 или UTF-16 (часто «Блокнот» сохраняет UTF-16 — тогда dotenv не видит переменные).
@@ -39,16 +64,27 @@ if (!loadEnvFile(envPath)) {
   loadEnvFile(envTxtPath);
 }
 
+// Этот блок включается на хостингах с обязательной пробой порта — задайте BOT_HEALTH_PORT=8080 как в telegram-bot/amvera.yaml.
+const probePortRaw = (process.env.BOT_HEALTH_PORT || "").trim();
+if (probePortRaw) {
+  const port = Number.parseInt(probePortRaw, 10);
+  if (Number.isFinite(port) && port > 0 && port <= 65535) {
+    startProbeHttpServer(port);
+  }
+}
+
 const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
 if (!token) {
-  console.error("Задайте TELEGRAM_BOT_TOKEN в файле telegram-bot/.env");
+  console.error(
+    "Задайте TELEGRAM_BOT_TOKEN (файл telegram-bot/.env локально или переменные окружения на Amvera).",
+  );
   process.exit(1);
 }
 
 const apiSecret = process.env.TELEGRAM_BOT_API_SECRET?.trim();
 if (!apiSecret) {
   console.error(
-    "Задайте TELEGRAM_BOT_API_SECRET в telegram-bot/.env (тот же секрет, что TELEGRAM_BOT_API_SECRET в backend/.env)",
+    "Задайте TELEGRAM_BOT_API_SECRET (тот же секрет, что TELEGRAM_BOT_API_SECRET в backend/.env) — в .env или в настройках приложения на хостинге.",
   );
   process.exit(1);
 }
