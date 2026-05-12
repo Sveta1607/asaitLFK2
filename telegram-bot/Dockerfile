@@ -11,4 +11,6 @@ RUN npm ci --omit=dev
 COPY . .
 
 # Запуск как в package.json — node index.js (long polling).
+# Порт для пробы (если задан BOT_HEALTH_PORT или PORT в окружении) — см. index.js.
+EXPOSE 8080
 CMD ["npm", "start"]

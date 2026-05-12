@@ -64,8 +64,8 @@ if (!loadEnvFile(envPath)) {
   loadEnvFile(envTxtPath);
 }
 
-// Этот блок включается на хостингах с обязательной пробой порта — задайте BOT_HEALTH_PORT=8080 как в telegram-bot/amvera.yaml.
-const probePortRaw = (process.env.BOT_HEALTH_PORT || "").trim();
+// Этот блок: BOT_HEALTH_PORT явно; иначе PORT (часто подставляет Amvera/K8s = containerPort) — иначе проба бьёт в пустоту и под перезапускается без явной «ошибки» в коде.
+const probePortRaw = (process.env.BOT_HEALTH_PORT || process.env.PORT || "").trim();
 if (probePortRaw) {
   const port = Number.parseInt(probePortRaw, 10);
   if (Number.isFinite(port) && port > 0 && port <= 65535) {
