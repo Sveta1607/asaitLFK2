@@ -6,7 +6,8 @@ WORKDIR /app
 
 # Копируем package.json из frontend (контекст = корень репо).
 COPY frontend/package*.json ./
-RUN npm ci
+# --no-audit --no-fund укорачивают вывод и сетевые запросы; на слабом канале до registry.npm Amvera экономит минуты.
+RUN npm ci --no-audit --no-fund
 
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=${VITE_API_URL}

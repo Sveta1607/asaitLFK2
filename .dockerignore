@@ -19,9 +19,14 @@
 # Зависимости и сборка фронта: в контейнере ставятся через npm ci / npm run build.
 frontend/node_modules/
 frontend/dist/
+# Отчёты e2e не нужны образу — могут раздувать контекст на мегабайты.
+frontend/playwright-report/
+frontend/test-results/
 
-# Зависимости телеграм-бота (если репо целиком в контексте).
-telegram-bot/node_modules/
+# Сборка Dockerfile.frontend использует только каталог frontend/: бэкенд и бот не копируются, но без исключения
+# они всё равно уезжают в контекст на Amvera → долгая отправка и шаг «transferring context».
+backend/
+telegram-bot/
 
 # Дубликат исходников в корне (если есть).
 src/node_modules/
